@@ -1554,7 +1554,7 @@ function drawG(){
   if (!dead && pWaveTrail.length > 1) {
       gCtx2.save();
       gCtx2.beginPath();
-      gCtx2.strokeStyle = 'rgba(0, 246, 255, 0.7)'; 
+      gCtx2.strokeStyle = 'rgba(0, 255, 0, 1)'; 
       gCtx2.lineWidth = TILE * 0.25;
       gCtx2.lineCap = 'round';
       gCtx2.lineJoin = 'round';
@@ -1577,7 +1577,7 @@ function drawG(){
         else {gCtx2.fillStyle='#7DF';gCtx2.fillRect(-TILE*0.3,-TILE*0.56,TILE*0.45,TILE*0.45);}
       } else if (gMode==='wave'){
         const wi=IM.wave;
-        if(ok(wi)) gCtx2.drawImage(wi, -TILE*0.45, -TILE*0.45, TILE*0.9, TILE*0.9);
+        if(ok(wi)) gCtx2.drawImage(wi, -TILE*0.5, -TILE*0.45, TILE*1.0, TILE*0.9);
         else {gCtx2.fillStyle='#7DF';gCtx2.fillRect(-TILE*0.4,-TILE*0.4,TILE*0.8,TILE*0.8);}
       } else {
         const ci=IM.cube; if(ok(ci))gCtx2.drawImage(ci,-TILE/2,-TILE/2,TILE,TILE);
