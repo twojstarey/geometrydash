@@ -257,7 +257,8 @@ const SRC={
   orb:'https://i.imgur.com/ysH0qCh.png',
   deco1:'https://i.imgur.com/Mp27IWo.png',
   deco2:'https://i.imgur.com/omTYQuo.png',
-  bg_trigger:'https://i.imgur.com/zsf7WEb.png'
+  bg_trigger:'https://i.imgur.com/zsf7WEb.png',
+  shallow_slope:'https://i.imgur.com/Rwlqpu6.png'
 };
 const IM={};
 for(const[k,v]of Object.entries(SRC)){const i=new Image();i.crossOrigin='anonymous';i.src=v;IM[k]=i;}
@@ -299,6 +300,7 @@ const TYPES=[
   {id:'ship_port',lbl:'Ship\nPortal',img:'ship_port',w:1.4,  h:2.7, kind:'pship', solid:false},
   {id:'wave_port',lbl:'Wave\nPortal',img:'wave_port',w:1.4,  h:2.7, kind:'pwave', solid:false},
   {id:'bg_trigger',lbl:'BG\nTrigger',img:'bg_trigger',w:1,   h:1,   kind:'trigger',solid:false},
+  {id:'shallow_slope',lbl:'Shallow\nSlope',img:'shallow_slope',w:1,h:1,kind:'slope',solid:true},
 ];
 function td(id){return TYPES.find(t=>t.id===id)||TYPES[0];}
 
@@ -976,6 +978,17 @@ function drawEd(){
         const spikeCenterY_visual = (sh/2) - sHH_visual;
         edCtx.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2);
       }
+      else if(t.kind==='slope'){
+        // Triangle hitbox matching the shallow slope shape: bottom-left, bottom-right, top-right
+        edCtx.strokeStyle='rgba(60,80,255,.9)';
+        edCtx.lineWidth=2;
+        edCtx.beginPath();
+        edCtx.moveTo(-sw/2,  sh/2);
+        edCtx.lineTo( sw/2,  sh/2);
+        edCtx.lineTo( sw/2, -sh/2);
+        edCtx.closePath();
+        edCtx.stroke();
+      }
     }
     edCtx.restore();
     if(isSel){edCtx.strokeStyle='#FFD700';edCtx.lineWidth=2;edCtx.strokeRect(scr.x-sw/2-3,scr.y-sh/2-3,sw+6,sh+6);}
@@ -1067,7 +1080,7 @@ function startGame(lv,fe){
 }
 
 function resetPl(){
-  player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false};
+  player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false};
   gZoom = gC ? gC.height / 768 : 1; 
   const logicalW = gC ? gC.width / gZoom : innerWidth;
   
@@ -1209,7 +1222,8 @@ function updateG(dt){
       player.vy=0;
       player.onGround=true;
     }
-    if(!player.onGround) player.rot+=420*dt; 
+    if(!player.onGround) player.rot+=420*dt;
+    player.onSlope = false; // reset each frame, set true if touching slope
     jPrev=jHeld;
   } else if(gMode==='ship'){
     if(jHeld)player.vy+=SHIP_THRUST*dt;else player.vy+=SHIP_GRAV*dt;
@@ -1354,6 +1368,41 @@ function updateG(dt){
           die(); return; 
       }
       
+    } else if(t.kind==='slope'){
+      // Shallow slope: right-angled triangle with base on bottom, vertical on right side
+      // The slope surface goes from bottom-left to top-right
+      // In wave mode: instant death on contact. In cube/ship: act as a ramp.
+      if(gMode === 'wave'){
+        // Wave death: check if player is inside the triangle bounding box
+        if(dx < hw && dy < hh){
+          // Triangle: bottom-left to bottom-right to top-right
+          // Point (px,py) relative to obj center
+          const px_r = player.x - obj.x; // relative x
+          const py_r = player.y - obj.y; // relative y
+          // The hypotenuse goes from (-hw, hh) to (hw, -hh) (bottom-left to top-right)
+          // Above the hypotenuse = inside the slope solid region
+          // Hypotenuse line: (py - hh) / (dx_total) = (-2*hh) / (2*hw) => py_on_line at px_r = hh - (px_r + hw) * (hh / hw)
+          const surfaceY = hh - (px_r + hw) * (hh / hw);
+          if(py_r >= surfaceY){
+            die(); return;
+          }
+        }
+      } else {
+        // Cube/ship: ramp behavior
+        if(dx < hw + pLandHW && dy < hh + pLandHH && player.vy >= 0){
+          const px_r = player.x - obj.x;
+          // Y of slope surface at player x
+          const surfaceY = obj.y + hh - (px_r + hw) * (hh / hw);
+          const playerBottom = player.y + pLandHH;
+          if(playerBottom >= surfaceY && player.y < obj.y + hh){
+            player.y = surfaceY - pLandHH;
+            player.vy = 0;
+            player.onGround = true;
+            player.onSlope = true;
+            continue;
+          }
+        }
+      }
     } else if(t.kind==='pad'){
       if(player.vy>=0 && dx < hw + pLandHW && dy < hh + pLandHH){player.vy=JUMP_V*1.7;player.onGround=false;}
     } else if(t.kind==='orb'){
@@ -1366,7 +1415,20 @@ function updateG(dt){
   }
 
   if(gMode==='cube' && player.onGround){
-      player.rot=Math.round(player.rot/90)*90;
+      if(player.onSlope){
+        const slopeTarget = -70;
+        let cur = ((player.rot % 360) + 360) % 360;
+        if(cur > 180) cur -= 360;
+        player.rot = cur;
+        const diff = slopeTarget - player.rot;
+        player.rot += diff * Math.min(1, 14 * dt);
+      } else {
+        // Snap to nearest 90 on flat ground
+        const snapped = Math.round(player.rot / 90) * 90;
+        const diff = snapped - player.rot;
+        player.rot += diff * Math.min(1, 18 * dt);
+        if(Math.abs(diff) < 0.5) player.rot = snapped;
+      }
       if(jHeld||jumpBuf>0){ 
           player.vy=JUMP_V; 
           player.onGround=false; 
@@ -1374,6 +1436,13 @@ function updateG(dt){
           player.y += player.vy * dt; 
       }
   }
+
+  // Skateboard launch: detect moment cube leaves the slope tip
+  if(player.wasOnSlope && !player.onSlope && !player.onGround && gMode==='cube'){
+    // Apply a small upward kick — like flying off the top of a ramp
+    player.vy = Math.min(player.vy, JUMP_V * 0.38);
+  }
+  player.wasOnSlope = player.onSlope;
   if(player.x>=lvEnd){ won=true;show('win-screen','flex');$('win-screen').onclick=exitGame; }
   const pct=Math.min(100,Math.max(0,(player.x/lvEnd)*100));
   $('prog-bar').style.width=pct+'%'; $('g-pct').textContent=Math.floor(pct)+'%';
@@ -1542,6 +1611,15 @@ function drawG(){
         const sHW_visual=(sw/2)*0.40, sHH_visual=(sh/2)*0.60;
         const spikeCenterY_visual = (sh/2) - sHH_visual;
         gCtx2.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2); 
+      }
+      else if(t.kind==='slope'){
+        gCtx2.strokeStyle='rgba(60,80,255,.9)'; gCtx2.lineWidth=2;
+        gCtx2.beginPath();
+        gCtx2.moveTo(-sw/2,  sh/2);
+        gCtx2.lineTo( sw/2,  sh/2);
+        gCtx2.lineTo( sw/2, -sh/2);
+        gCtx2.closePath();
+        gCtx2.stroke();
       }
       else if(t.kind==='trigger' || t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave'){ gCtx2.strokeStyle='rgba(100,255,100,.9)'; gCtx2.lineWidth=2; gCtx2.strokeRect(-sw/2,-sh/2,sw,sh); }
     }
