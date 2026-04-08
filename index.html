@@ -1473,36 +1473,47 @@ function updateG(dt){
       }
       
     } else if(t.kind==='slope'){
-      // Shallow slope: right-angled triangle with base on bottom, vertical on right side
-      // The slope surface goes from bottom-left to top-right
-      // In wave mode: instant death on contact. In cube/ship: act as a ramp.
+      // Transform player into slope's local space to handle any rotation
+      const sRad = -(obj.rot || 0) * Math.PI / 180;
+      const sCos = Math.cos(sRad), sSin = Math.sin(sRad);
+      const relX = player.x - obj.x, relY = player.y - obj.y;
+      const lx = relX * sCos - relY * sSin; // local X
+      const ly = relX * sSin + relY * sCos; // local Y
+
+      // At rot=0 the hypotenuse goes bottom-left→top-right = ramp (safe to slide)
+      // At rot=180 (placed backwards) it goes top-left→bottom-right = wall (deadly)
+      const normRot = ((obj.rot || 0) % 360 + 360) % 360;
+      const isBackwards = normRot > 90 && normRot < 270;
+
+      // Hypotenuse surface in local space: from (-hw, hh) to (hw, -hh)
+      // surfaceY at lx = hh - (lx + hw) * (hh / hw)
+
       if(gMode === 'wave'){
-        // Only kill if player center is clearly inside the solid triangle region
-        if(dx < hw + TILE*0.1 && dy < hh + TILE*0.1){
-          const px_r = player.x - obj.x;
-          const py_r = player.y - obj.y;
-          // Hypotenuse from bottom-left (-hw,hh) to top-right (hw,-hh)
-          // Surface Y at player X: hh - (px_r + hw) * (hh/hw)
-          const surfaceY = hh - (px_r + hw) * (hh / hw);
-          // Only die if clearly below the surface AND inside the base rect
-          // Add a small tolerance so grazing the slope is safe
-          if(py_r > surfaceY + TILE*0.15 && px_r > -hw && px_r < hw){
-            die(); return;
+        if(Math.abs(lx) < hw + TILE*0.1 && Math.abs(ly) < hh + TILE*0.1){
+          const surfaceY = hh - (lx + hw) * (hh / hw);
+          if(isBackwards){
+            // Backwards: whole block is deadly for wave
+            if(Math.abs(lx) < hw && Math.abs(ly) < hh){ die(); return; }
+          } else {
+            // Forward: only the solid triangle region kills
+            if(ly > surfaceY + TILE*0.15 && lx > -hw && lx < hw){ die(); return; }
           }
         }
+      } else if(isBackwards){
+        // Backwards slope = deadly solid for cube/ship
+        if(Math.abs(lx) < hw + pRedHW && Math.abs(ly) < hh + pRedHH){
+          const surfaceY = hh - (lx + hw) * (hh / hw);
+          if(ly > surfaceY){ die(); return; }
+        }
       } else {
-        // Cube/ship: ramp behavior — only if approaching from the left/top
-        // px_r is player X relative to slope center
-        const px_r = player.x - obj.x;
-        // Only collide if player is within the slope width (left side to right edge)
-        // and not past the top-right tip (where slope ends and player should just fall)
-        if(px_r < hw && dx < hw + pLandHW && dy < hh + pLandHH && player.vy >= 0){
-          // Y of slope surface at player x
-          const surfaceY = obj.y + hh - (px_r + hw) * (hh / hw);
+        // Forward slope: ramp — only land from the ascending (left) side
+        if(lx < hw && Math.abs(lx) < hw + pLandHW && Math.abs(ly) < hh + pLandHH && player.vy >= 0){
+          const surfaceYLocal = hh - (lx + hw) * (hh / hw);
+          // Convert local surface point back to world Y
+          const surfaceYWorld = obj.y + sSin * lx + sCos * surfaceYLocal;
           const playerBottom = player.y + pLandHH;
-          // Only land if player bottom reaches surface and player center is above the base
-          if(playerBottom >= surfaceY && player.y < obj.y + hh){
-            player.y = surfaceY - pLandHH;
+          if(playerBottom >= surfaceYWorld && player.y < obj.y + hh){
+            player.y = surfaceYWorld - pLandHH;
             player.vy = 0;
             player.onGround = true;
             player.onSlope = true;
@@ -1632,8 +1643,14 @@ function drawG(){
       for(let tx=off;tx<logicalW+GROUND_TS;tx+=GROUND_TS)
         gCtx2.drawImage(IM.ground, tx, -animCeilY, GROUND_TS, GROUND_TS);
       gCtx2.restore();
+      // Tint ceiling ground — must be after restore() so we're back in normal space
+      gCtx2.globalCompositeOperation='multiply';
+      gCtx2.fillStyle=rgbToHex(Math.round(gGndCol[0]),Math.round(gGndCol[1]),Math.round(gGndCol[2]));
+      gCtx2.fillRect(0, 0, logicalW, animCeilY);
+      gCtx2.globalCompositeOperation='source-over';
     } else {
-      gCtx2.fillStyle='#3a6020'; gCtx2.fillRect(0, animCeilY - GROUND_TS, logicalW, GROUND_TS);
+      gCtx2.fillStyle=rgbToHex(Math.round(gGndCol[0]),Math.round(gGndCol[1]),Math.round(gGndCol[2]));
+      gCtx2.fillRect(0, animCeilY - GROUND_TS, logicalW, GROUND_TS);
     }
   }
 
