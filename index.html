@@ -1357,7 +1357,13 @@ function updateG(dt){
   const pBlueHW = TILE * 0.15, pBlueHH = TILE * 0.15;  
   const pLandHW = TILE * 0.5, pLandHH = TILE * 0.5;    
 
-  for(const obj of curLv.objs){
+  // Process slopes first so onSlope is set before block collision checks
+  const sortedObjs = [...curLv.objs].sort((a,b) => {
+    const ak = td(a.typeId).kind, bk = td(b.typeId).kind;
+    return (ak==='slope'?0:1) - (bk==='slope'?0:1);
+  });
+
+  for(const obj of sortedObjs){
     const t=td(obj.typeId),sc=obj.scale||1;
     if (t.isDeco) continue; 
     
@@ -1430,6 +1436,10 @@ function updateG(dt){
               die(); return;
           }
       } else {
+          // If player is riding a slope, skip block collision entirely —
+          // the slope surface is the authority on player position
+          if (player.onSlope) continue;
+
           const playerEffectiveTop = player.y - pLandHH; 
           const playerEffectiveBottom = player.y + pLandHH;
           const blockTopEdge = obj.y - hh;
