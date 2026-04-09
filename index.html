@@ -236,7 +236,7 @@ const CEIL_Y = -3*TILE;
 const SHIP_TUNNEL_H = GROUND_Y - CEIL_Y; 
 const GROUND_TS=250;
 const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1380;
-const SHIP_GRAV=3000, SHIP_THRUST=-3800, SHIP_MAXVY=1080;
+const SHIP_GRAV=3000, SHIP_THRUST=-3600, SHIP_MAXVY=1080;
 const BG_PAR=0.12;
 const BG_TS=1400;
 const tintCache = new Map();
@@ -1308,7 +1308,7 @@ function updateG(dt){
       player.vy=0;
       player.onGround=true;
     }
-    if(!player.onGround) player.rot+=420*dt;
+    if(!player.onGround) player.rot+=390*dt;
     player.onSlope = false; // reset each frame, set true if touching slope
     jPrev=jHeld;
   } else if(gMode==='ship'){
