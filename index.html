@@ -236,7 +236,7 @@ const CEIL_Y = -3*TILE;
 const SHIP_TUNNEL_H = GROUND_Y - CEIL_Y; 
 const GROUND_TS=250;
 const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1380;
-const SHIP_GRAV=3000, SHIP_THRUST=-3600, SHIP_MAXVY=1080;
+const SHIP_GRAV=2800, SHIP_THRUST=-3500, SHIP_MAXVY=1080;
 const BG_PAR=0.12;
 const BG_TS=1400;
 const tintCache = new Map();
@@ -247,7 +247,7 @@ let shipTransDir = 1;
 const TRANS_DUR = 0.55;  
 let prevGMode = 'cube';  
 let playTrail =[];
-let pWaveTrail =[]; // Keeps track of wave line 
+let pWaveTrail =[]; 
 
 const SRC={
   bg:'https://i.imgur.com/PsXJdC6.png',
@@ -273,7 +273,8 @@ const SRC={
   deco1:'https://i.imgur.com/Mp27IWo.png',
   deco2:'https://i.imgur.com/omTYQuo.png',
   bg_trigger:'https://i.imgur.com/zsf7WEb.png',
-  shallow_slope:'https://i.imgur.com/Rwlqpu6.png'
+  shallow_slope:'https://i.imgur.com/Rwlqpu6.png',
+  saw:'https://i.imgur.com/eRhUsPU.png'
 };
 const IM={};
 for(const[k,v]of Object.entries(SRC)){const i=new Image();i.crossOrigin='anonymous';i.src=v;IM[k]=i;}
@@ -317,6 +318,7 @@ const TYPES=[
   {id:'bg_trigger',lbl:'BG\nTrigger',img:'bg_trigger',w:1,   h:1,   kind:'trigger',solid:false},
   {id:'ground_trigger',lbl:'Ground\nTrigger',img:'ground_trigger',w:1,h:1,kind:'gtrigger',solid:false},
   {id:'shallow_slope',lbl:'Shallow\nSlope',img:'shallow_slope',w:1,h:1,kind:'slope',solid:true},
+  {id:'saw',      lbl:'Saw',         img:'saw',      w:2,    h:2,   kind:'saw',   solid:false},
 ];
 function td(id){return TYPES.find(t=>t.id===id)||TYPES[0];}
 
@@ -893,7 +895,7 @@ function delSel(){
 
 function placeObj(wx,wy){
   const t=selType,sc=selScale;
-  const step = (t.id === 'half_block' || t.id === 'small_spk' || t.id === 'black_spk' || t.isDeco) ? TILE/2 : TILE;
+  const step = (t.id === 'half_block' || t.id === 'small_spk' || t.id === 'black_spk' || t.isDeco || t.id === 'saw') ? TILE/2 : TILE;
   const sw = t.w * TILE * sc;
   const sh = t.h * TILE * sc;
   
@@ -905,7 +907,7 @@ function placeObj(wx,wy){
   
   const occupied=edObjs.some(o=>{
     const ot=td(o.typeId),osc=o.scale||1;
-    if (t.isDeco || ot.isDeco) return false; 
+    if (t.isDeco || ot.isDeco || t.kind === 'saw' || ot.kind === 'saw') return false; 
     const ohw=ot.w*TILE*osc/2,ohh=ot.h*TILE*osc/2;
     const thw=sw/2,thh=sh/2;
     return Math.abs(o.x-sx)<(thw+ohw)*0.5&&Math.abs(o.y-sy)<(thh+ohh)*0.5;
@@ -1023,7 +1025,10 @@ function drawEd(){
     const t=td(o.typeId),sc=o.scale||1;
     const scr=w2s(o.x,o.y),sw=t.w*TILE*sc*camZoom,sh=t.h*TILE*sc*camZoom;
     const rot=(o.rot||0)*Math.PI/180,isSel=selObjs.includes(o);
-    edCtx.save();edCtx.translate(scr.x,scr.y);edCtx.rotate(rot);
+    edCtx.save();edCtx.translate(scr.x,scr.y);
+    if(t.kind === 'saw') edCtx.rotate(rot + performance.now() / -250); // Continually spins
+    else edCtx.rotate(rot);
+
     if(isSel){edCtx.shadowColor='#FFD700';edCtx.shadowBlur=16;}
     const img=IM[t.img];
     
@@ -1053,7 +1058,6 @@ function drawEd(){
         edCtx.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2);
       }
       else if(t.kind==='slope'){
-        // Triangle hitbox matching the shallow slope shape: bottom-left, bottom-right, top-right
         edCtx.strokeStyle='rgba(60,80,255,.9)';
         edCtx.lineWidth=2;
         edCtx.beginPath();
@@ -1061,6 +1065,13 @@ function drawEd(){
         edCtx.lineTo( sw/2,  sh/2);
         edCtx.lineTo( sw/2, -sh/2);
         edCtx.closePath();
+        edCtx.stroke();
+      }
+      else if(t.kind==='saw'){
+        edCtx.strokeStyle='rgba(255,80,80,.9)';
+        edCtx.lineWidth=2;
+        edCtx.beginPath();
+        edCtx.arc(0, 0, 0.75 * TILE * sc * camZoom, 0, Math.PI*2); // Precise circular hitbox scale
         edCtx.stroke();
       }
     }
@@ -1309,7 +1320,7 @@ function updateG(dt){
       player.onGround=true;
     }
     if(!player.onGround) player.rot+=390*dt;
-    player.onSlope = false; // reset each frame, set true if touching slope
+    player.onSlope = false; 
     jPrev=jHeld;
   } else if(gMode==='ship'){
     if(jHeld)player.vy+=SHIP_THRUST*dt;else player.vy+=SHIP_GRAV*dt;
@@ -1333,8 +1344,8 @@ function updateG(dt){
     else player.onGround=false;
 
     let targetRot = jHeld ? -45 : 45;
-    if (isFloor) targetRot = 0; // slide horizontally
-    if (isCeil) targetRot = 0;  // slide horizontally
+    if (isFloor) targetRot = 0; 
+    if (isCeil) targetRot = 0;  
 
     const rotSpeed = 900; 
     if (player.rot < targetRot) {
@@ -1382,7 +1393,7 @@ function updateG(dt){
                 gMode='wave'; player.vy=0;
                 player.rot = player.rot % 360;
                 if(player.rot > 180) player.rot -= 360; else if(player.rot < -180) player.rot += 360;
-                pWaveTrail = [{x: player.x, y: player.y}];
+                pWaveTrail =[{x: player.x, y: player.y}];
             }
         }
         continue; 
@@ -1436,8 +1447,6 @@ function updateG(dt){
               die(); return;
           }
       } else {
-          // If player is riding a slope, skip block collision entirely —
-          // the slope surface is the authority on player position
           if (player.onSlope) continue;
 
           const playerEffectiveTop = player.y - pLandHH; 
@@ -1482,44 +1491,44 @@ function updateG(dt){
           die(); return; 
       }
       
+    } else if(t.kind==='saw'){
+      const hitboxR = 0.75 * TILE * sc; 
+      let pHW = pRedHW, pHH = pRedHH;
+      if(gMode === 'wave'){ pHW = TILE*0.3; pHH = TILE*0.3; }
+      
+      if(dx <= pHW + hitboxR && dy <= pHH + hitboxR){
+          if(dx <= pHW || dy <= pHH) { die(); return; }
+          const cornerSq = (dx - pHW)*(dx - pHW) + (dy - pHH)*(dy - pHH);
+          if(cornerSq <= hitboxR*hitboxR) { die(); return; }
+      }
+
     } else if(t.kind==='slope'){
-      // Transform player into slope's local space to handle any rotation
       const sRad = -(obj.rot || 0) * Math.PI / 180;
       const sCos = Math.cos(sRad), sSin = Math.sin(sRad);
       const relX = player.x - obj.x, relY = player.y - obj.y;
-      const lx = relX * sCos - relY * sSin; // local X
-      const ly = relX * sSin + relY * sCos; // local Y
+      const lx = relX * sCos - relY * sSin; 
+      const ly = relX * sSin + relY * sCos; 
 
-      // At rot=0 the hypotenuse goes bottom-left→top-right = ramp (safe to slide)
-      // At rot=180 (placed backwards) it goes top-left→bottom-right = wall (deadly)
       const normRot = ((obj.rot || 0) % 360 + 360) % 360;
       const isBackwards = normRot > 90 && normRot < 270;
-
-      // Hypotenuse surface in local space: from (-hw, hh) to (hw, -hh)
-      // surfaceY at lx = hh - (lx + hw) * (hh / hw)
 
       if(gMode === 'wave'){
         if(Math.abs(lx) < hw + TILE*0.1 && Math.abs(ly) < hh + TILE*0.1){
           const surfaceY = hh - (lx + hw) * (hh / hw);
           if(isBackwards){
-            // Backwards: whole block is deadly for wave
             if(Math.abs(lx) < hw && Math.abs(ly) < hh){ die(); return; }
           } else {
-            // Forward: only the solid triangle region kills
             if(ly > surfaceY + TILE*0.15 && lx > -hw && lx < hw){ die(); return; }
           }
         }
       } else if(isBackwards){
-        // Backwards slope = deadly solid for cube/ship
         if(Math.abs(lx) < hw + pRedHW && Math.abs(ly) < hh + pRedHH){
           const surfaceY = hh - (lx + hw) * (hh / hw);
           if(ly > surfaceY){ die(); return; }
         }
       } else {
-        // Forward slope: ramp — only land from the ascending (left) side
         if(lx < hw && Math.abs(lx) < hw + pLandHW && Math.abs(ly) < hh + pLandHH && player.vy >= 0){
           const surfaceYLocal = hh - (lx + hw) * (hh / hw);
-          // Convert local surface point back to world Y
           const surfaceYWorld = obj.y + sSin * lx + sCos * surfaceYLocal;
           const playerBottom = player.y + pLandHH;
           if(playerBottom >= surfaceYWorld && player.y < obj.y + hh){
@@ -1551,7 +1560,6 @@ function updateG(dt){
         const diff = slopeTarget - player.rot;
         player.rot += diff * Math.min(1, 14 * dt);
       } else {
-        // Snap to nearest 90 on flat ground
         const snapped = Math.round(player.rot / 90) * 90;
         const diff = snapped - player.rot;
         player.rot += diff * Math.min(1, 18 * dt);
@@ -1565,12 +1573,9 @@ function updateG(dt){
       }
   }
 
-  // Skateboard launch: detect moment cube leaves the slope tip into air
-  // Only trigger if truly airborne (not just stepped onto a block)
   if(player.wasOnSlope && !player.onSlope && !player.onGround && gMode==='cube'){
     player.vy = Math.min(player.vy, JUMP_V * 0.38);
   }
-  // If we're on flat ground (not slope), cancel pending launch
   if(player.onGround && !player.onSlope) player.wasOnSlope = false;
   player.wasOnSlope = player.onSlope;
   if(player.x>=lvEnd){ won=true;show('win-screen','flex');$('win-screen').onclick=exitGame; }
@@ -1671,7 +1676,10 @@ function drawG(){
     if(sx<-TILE*4||sx>logicalW+TILE*4)return;
     const rot=(obj.rot||0)*Math.PI/180;
     let sw=t.w*TILE*sc, sh=t.h*TILE*sc;
-    gCtx2.save();gCtx2.translate(sx,sy);gCtx2.rotate(rot);
+    gCtx2.save();gCtx2.translate(sx,sy);
+    if (t.kind === 'saw') gCtx2.rotate(rot + performance.now() / -250); // Spin smoothly
+    else gCtx2.rotate(rot);
+
     const img=IM[t.img];
 
     let drawSw = sw, drawSh = sh;
@@ -1687,17 +1695,14 @@ function drawG(){
             let tAnim = anim.t;
             let clickScale = 1.0;
             
-            // 1. Resizes after 0.12 second (gets bigger 60%)
             if (tAnim <= 0.12) {
                 clickScale = 1.0 + (tAnim / 0.12) * 0.6;
                 glowAlpha = 1.0;
             } 
-            // 2. Resizes back to normal after 0.09 seconds
             else if (tAnim <= 0.21) {
                 clickScale = 1.6 - ((tAnim - 0.12) / 0.09) * 0.6;
                 glowAlpha = 1.0;
             } 
-            // 3. Glow animation slowly fading away after 0.1 second
             else if (tAnim <= 0.31) {
                 clickScale = 1.0;
                 glowAlpha = 1.0 - ((tAnim - 0.21) / 0.1);
@@ -1734,13 +1739,12 @@ function drawG(){
       else{gCtx2.fillStyle='#555';gCtx2.fillRect(-drawSw/2,-drawSh/2,drawSw,drawSh);}
     }
     
-    // Wave Ring Effect
     if(t.kind==='orb'){
       const anim=orbAnims.find(a=>a.x===obj.x&&a.y===obj.y);
       if(anim && anim.t <= 0.28){
         let ringP = anim.t / 0.28;
-        const ringScale = 1 + ringP * 1.0; // Gets bigger smoothly
-        gCtx2.globalAlpha = (1 - ringP) * 0.8; // Fades away up to 0.28s
+        const ringScale = 1 + ringP * 1.0; 
+        gCtx2.globalAlpha = (1 - ringP) * 0.8; 
         gCtx2.save(); gCtx2.scale(ringScale, ringScale);
         gCtx2.strokeStyle = '#FFD700'; gCtx2.lineWidth = 4;
         gCtx2.beginPath(); gCtx2.arc(0,0,sw*0.55,0,Math.PI*2); gCtx2.stroke();
@@ -1764,6 +1768,13 @@ function drawG(){
         gCtx2.closePath();
         gCtx2.stroke();
       }
+      else if(t.kind==='saw'){
+        gCtx2.strokeStyle='rgba(255,80,80,.9)'; 
+        gCtx2.lineWidth=2; 
+        gCtx2.beginPath();
+        gCtx2.arc(0, 0, 0.75 * TILE * sc, 0, Math.PI*2);
+        gCtx2.stroke();
+      }
       else if(t.kind==='trigger' || t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave'){ gCtx2.strokeStyle='rgba(100,255,100,.9)'; gCtx2.lineWidth=2; gCtx2.strokeRect(-sw/2,-sh/2,sw,sh); }
     }
     gCtx2.restore();
@@ -1771,7 +1782,6 @@ function drawG(){
 
   const px=sX(player.x),py=sY(player.y); 
 
-  // --- DRAW WAVE TRAIL BEFORE PLAYER ---
   if (!dead && pWaveTrail.length > 1) {
       gCtx2.save();
       gCtx2.beginPath();
