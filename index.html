@@ -53,10 +53,14 @@ body{background:#000;font-family:'Arial Black',Arial,sans-serif;color:#fff;overf
 .ep-close{position:absolute;top:8px;right:8px;background:#E74C3C;border:none;color:#fff;border-radius:6px;width:24px;height:24px;font-weight:bold;cursor:pointer;}
 .ep-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#fff;}
 .ep-row input[type="color"]{width:70px; height:24px; padding:0; border:1px solid #3AF; background: none;}
-.ep-row input[type="number"]{width:70px;background:#223;color:#fff;border:1px solid #3AF;border-radius:4px;padding:2px 4px;}
+.ep-row input[type="number"], .ep-row select{width:75px;background:#223;color:#fff;border:1px solid #3AF;border-radius:4px;padding:2px 4px;}
+
 #btn-edit-obj{top:65px;}
-#trig-menu{top:115px;width:220px;}
-#deco-menu{top:115px;width:220px;}
+#btn-edit-group{top:110px; background:#9B59B6; border-color:#8E44AD;}
+
+#trig-menu, #deco-menu, #gtrig-menu, #alpha-menu, #move-menu, #startpos-menu, #group-menu {
+  top:155px; width:220px;
+}
 
 #esc-ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:300;background:rgba(0,0,0,.75);}
 #esc-box{background:#0c0c28;border:3px solid #3AF;border-radius:18px;padding:26px 34px;min-width:300px;text-align:center;}
@@ -159,6 +163,8 @@ body{background:#000;font-family:'Arial Black',Arial,sans-serif;color:#fff;overf
   <div id="ed-panel"></div>
   
   <button id="btn-edit-obj" class="editor-popup" onclick="openActiveMenu()">⚙ Edit Object</button>
+  <button id="btn-edit-group" class="editor-popup" onclick="openGroupMenu()">🧩 Edit Group</button>
+  
   <div id="trig-menu" class="editor-popup">
     <button class="ep-close" onclick="closeActiveMenu()">X</button>
     <h3>BG Trigger</h3>
@@ -174,10 +180,43 @@ body{background:#000;font-family:'Arial Black',Arial,sans-serif;color:#fff;overf
     <div class="ep-row"><span>Fade Time (s):</span> <input type="number" id="gtrig-fade" step="0.1" min="0"></div>
     <div class="ep-row"><span>Touch Trigger:</span> <input type="checkbox" id="gtrig-touch"></div>
   </div>
+  <div id="alpha-menu" class="editor-popup">
+    <button class="ep-close" onclick="closeActiveMenu()">X</button>
+    <h3>Alpha Trigger</h3>
+    <div class="ep-row"><span>Target Group ID:</span> <input type="number" id="alpha-target" min="1" step="1"></div>
+    <div class="ep-row"><span>Fade Time (s):</span> <input type="number" id="alpha-fade" step="0.1" min="0"></div>
+    <div class="ep-row"><span>Opacity (0-1):</span> <input type="number" id="alpha-opac" step="0.1" min="0" max="1"></div>
+    <div class="ep-row"><span>Touch Trigger:</span> <input type="checkbox" id="alpha-touch"></div>
+  </div>
+  <div id="move-menu" class="editor-popup">
+    <button class="ep-close" onclick="closeActiveMenu()">X</button>
+    <h3>Move Trigger</h3>
+    <div class="ep-row"><span>Target Group ID:</span> <input type="number" id="move-target" min="1" step="1"></div>
+    <div class="ep-row"><span>Move X (blocks):</span> <input type="number" id="move-x" step="1"></div>
+    <div class="ep-row"><span>Move Y (blocks):</span> <input type="number" id="move-y" step="1"></div>
+    <div class="ep-row"><span>Move Time (s):</span> <input type="number" id="move-time" step="0.1" min="0"></div>
+    <div class="ep-row"><span>Touch Trigger:</span> <input type="checkbox" id="move-touch"></div>
+  </div>
+  <div id="startpos-menu" class="editor-popup">
+    <button class="ep-close" onclick="closeActiveMenu()">X</button>
+    <h3>Start Pos</h3>
+    <div class="ep-row"><span>Game Mode:</span>
+      <select id="start-mode">
+          <option value="cube">Cube</option>
+          <option value="ship">Ship</option>
+          <option value="wave">Wave</option>
+      </select>
+    </div>
+  </div>
   <div id="deco-menu" class="editor-popup">
     <button class="ep-close" onclick="closeActiveMenu()">X</button>
     <h3>Decoration Color</h3>
     <div class="ep-row"><span>Color Tint:</span> <input type="color" id="deco-col"></div>
+  </div>
+  <div id="group-menu" class="editor-popup">
+    <button class="ep-close" onclick="closeActiveMenu()">X</button>
+    <h3>Object Group</h3>
+    <div class="ep-row"><span>Group ID (0 = none):</span> <input type="number" id="obj-group-id" min="0" step="1"></div>
   </div>
 
   <div id="esc-ov">
@@ -256,6 +295,9 @@ const SRC={
   wave:'https://i.imgur.com/tvA1vnp.png',
   ground:'https://i.imgur.com/HCFkqKg.png',
   ground_trigger:'https://i.imgur.com/55QWy7m.png',
+  alpha_trigger:'https://i.imgur.com/gCZ5vqz.png',
+  move_trigger:'https://i.imgur.com/OAjbVEB.png',
+  start_pos:'https://i.imgur.com/FLnUP3c.png',
   spike:'https://i.imgur.com/9DwKJb2.png',
   jump_pad:'https://i.imgur.com/H7VvNeF.png',
   block1:'https://i.imgur.com/W383yv2.png',
@@ -315,8 +357,11 @@ const TYPES=[
   {id:'cube_port',lbl:'Cube\nPortal',img:'cube_port',w:1.4,  h:2.7, kind:'pcube', solid:false},
   {id:'ship_port',lbl:'Ship\nPortal',img:'ship_port',w:1.4,  h:2.7, kind:'pship', solid:false},
   {id:'wave_port',lbl:'Wave\nPortal',img:'wave_port',w:1.4,  h:2.7, kind:'pwave', solid:false},
+  {id:'start_pos',lbl:'Start\nPos',  img:'start_pos',w:1,    h:1,   kind:'start_pos',solid:false},
   {id:'bg_trigger',lbl:'BG\nTrigger',img:'bg_trigger',w:1,   h:1,   kind:'trigger',solid:false},
-  {id:'ground_trigger',lbl:'Ground\nTrigger',img:'ground_trigger',w:1,h:1,kind:'gtrigger',solid:false},
+  {id:'ground_trigger',lbl:'Ground\nTrigger',img:'ground_trigger',w:1,h:1,kind:'trigger',solid:false},
+  {id:'alpha_trigger',lbl:'Alpha\nTrigger',img:'alpha_trigger',w:1,h:1,kind:'trigger',solid:false},
+  {id:'move_trigger',lbl:'Move\nTrigger',img:'move_trigger',w:1,h:1,kind:'trigger',solid:false},
   {id:'shallow_slope',lbl:'Shallow\nSlope',img:'shallow_slope',w:1,h:1,kind:'slope',solid:true},
   {id:'saw',      lbl:'Saw',         img:'saw',      w:2,    h:2,   kind:'saw',   solid:false},
 ];
@@ -381,7 +426,10 @@ function setGroundC(v){edGroundColor=v;$('ground-color-inp').value=v;}
 let gBgCol =[26,42,108], gBgTarget =[26,42,108], gBgFadeT = 0, gBgFadeDur = 0;
 let gBgOpac = 1, gBgTargetOpac = 1, gBgStartOpac = 1;
 // Ground color state (for ground trigger)
-let gGndCol = [58,96,32], gGndTarget = [58,96,32], gGndFadeT = 0, gGndFadeDur = 0, gGndStartCol = [58,96,32];
+let gGndCol =[58,96,32], gGndTarget = [58,96,32], gGndFadeT = 0, gGndFadeDur = 0, gGndStartCol =[58,96,32];
+// Move and Alpha states
+let gMove = {};
+let gAlpha = {};
 
 function handleLocalMusicInput(event) {
     const files = event.target.files;
@@ -620,43 +668,90 @@ function openActiveMenu() {
         $('trig-col').value = o.bgCol || '#ff0000';
         $('trig-fade').value = o.bgFade !== undefined ? o.bgFade : 0.5;
         $('trig-opac').value = o.bgOpac !== undefined ? o.bgOpac : 1.0;
-        $('trig-touch').checked = !!o.bgTouch;
-        show('trig-menu','flex');
-        activeMenu = 'trig-menu';
+        $('trig-touch').checked = !!o.touch;
+        show('trig-menu','flex'); activeMenu = 'trig-menu';
     } else if (o.typeId === 'ground_trigger') {
         $('gtrig-col').value = o.gtCol || '#3a5520';
         $('gtrig-fade').value = o.gtFade !== undefined ? o.gtFade : 0.5;
-        $('gtrig-touch').checked = !!o.gtTouch;
-        show('gtrig-menu','flex');
-        activeMenu = 'gtrig-menu';
+        $('gtrig-touch').checked = !!o.touch;
+        show('gtrig-menu','flex'); activeMenu = 'gtrig-menu';
+    } else if (o.typeId === 'alpha_trigger') {
+        $('alpha-target').value = o.targetGroupId || 1;
+        $('alpha-fade').value = o.fadeTime !== undefined ? o.fadeTime : 0.5;
+        $('alpha-opac').value = o.opacity !== undefined ? o.opacity : 0;
+        $('alpha-touch').checked = !!o.touch;
+        show('alpha-menu','flex'); activeMenu = 'alpha-menu';
+    } else if (o.typeId === 'move_trigger') {
+        $('move-target').value = o.targetGroupId || 1;
+        $('move-x').value = o.moveX !== undefined ? o.moveX : 0;
+        $('move-y').value = o.moveY !== undefined ? o.moveY : 0;
+        $('move-time').value = o.moveTime !== undefined ? o.moveTime : 0.5;
+        $('move-touch').checked = !!o.touch;
+        show('move-menu','flex'); activeMenu = 'move-menu';
+    } else if (o.typeId === 'start_pos') {
+        $('start-mode').value = o.startMode || 'cube';
+        show('startpos-menu','flex'); activeMenu = 'startpos-menu';
     } else if (td(o.typeId).isDeco) {
         $('deco-col').value = o.color || '#ffffff';
-        show('deco-menu', 'flex');
-        activeMenu = 'deco-menu';
+        show('deco-menu', 'flex'); activeMenu = 'deco-menu';
     }
 }
+function openGroupMenu() {
+    if(selObjs.length === 0) return;
+    $('obj-group-id').value = selObjs[0].groupId || 0;
+    show('group-menu', 'flex'); activeMenu = 'group-menu';
+}
+
 function closeActiveMenu(){ 
     if(activeMenu) hide(activeMenu);
     activeMenu = null;
 }
-function bindTrigInputs(){['trig-col','trig-fade','trig-opac','trig-touch'].forEach(id=>{
+function bindTrigInputs(){
+  ['trig-col','trig-fade','trig-opac','trig-touch'].forEach(id=>{
     $(id).addEventListener('input',e=>{
       if(selObjs.length!==1 || selObjs[0].typeId !== 'bg_trigger') return;
       const o = selObjs[0];
       if(id==='trig-col') o.bgCol = e.target.value;
       if(id==='trig-fade') o.bgFade = parseFloat(e.target.value);
       if(id==='trig-opac') o.bgOpac = parseFloat(e.target.value);
-      if(id==='trig-touch') o.bgTouch = e.target.checked;
+      if(id==='trig-touch') o.touch = e.target.checked;
     });
-  });
-  ['gtrig-col','gtrig-fade','gtrig-touch'].forEach(id=>{
+  });['gtrig-col','gtrig-fade','gtrig-touch'].forEach(id=>{
     $(id).addEventListener('input',e=>{
       if(selObjs.length!==1 || selObjs[0].typeId !== 'ground_trigger') return;
       const o = selObjs[0];
       if(id==='gtrig-col') o.gtCol = e.target.value;
       if(id==='gtrig-fade') o.gtFade = parseFloat(e.target.value);
-      if(id==='gtrig-touch') o.gtTouch = e.target.checked;
+      if(id==='gtrig-touch') o.touch = e.target.checked;
     });
+  });['alpha-target', 'alpha-fade', 'alpha-opac', 'alpha-touch'].forEach(id => {
+    $(id).addEventListener('input', e => {
+        if(selObjs.length!==1 || selObjs[0].typeId !== 'alpha_trigger') return;
+        const o = selObjs[0];
+        if(id==='alpha-target') o.targetGroupId = parseInt(e.target.value)||1;
+        if(id==='alpha-fade') o.fadeTime = parseFloat(e.target.value)||0;
+        if(id==='alpha-opac') o.opacity = parseFloat(e.target.value)||0;
+        if(id==='alpha-touch') o.touch = e.target.checked;
+    });
+  });['move-target', 'move-x', 'move-y', 'move-time', 'move-touch'].forEach(id => {
+    $(id).addEventListener('input', e => {
+        if(selObjs.length!==1 || selObjs[0].typeId !== 'move_trigger') return;
+        const o = selObjs[0];
+        if(id==='move-target') o.targetGroupId = parseInt(e.target.value)||1;
+        if(id==='move-x') o.moveX = parseFloat(e.target.value)||0;
+        if(id==='move-y') o.moveY = parseFloat(e.target.value)||0; 
+        if(id==='move-time') o.moveTime = parseFloat(e.target.value)||0;
+        if(id==='move-touch') o.touch = e.target.checked;
+    });
+  });
+  $('start-mode').addEventListener('change', e => {
+      if(selObjs.length!==1 || selObjs[0].typeId !== 'start_pos') return;
+      selObjs[0].startMode = e.target.value;
+  });
+  $('obj-group-id').addEventListener('input', e => {
+      if(selObjs.length === 0) return;
+      const gid = parseInt(e.target.value) || 0;
+      selObjs.forEach(o => o.groupId = gid);
   });
   $('deco-col').addEventListener('input', e => {
       if(selObjs.length !== 1 || !td(selObjs[0].typeId).isDeco) return;
@@ -845,7 +940,7 @@ function edKey(e){
   if($('editor').style.display!=='flex')return;
   if(e.key==='Escape'){escOp?closeEsc():openEsc();return;}
   if(escOp)return;
-  if(e.target.tagName==='INPUT')return;
+  if(e.target.tagName==='INPUT' || e.target.tagName==='SELECT')return;
   const step=e.shiftKey?4:TILE;
   
   if(e.ctrlKey && (e.key==='z'||e.key==='Z')) { doUndo(); e.preventDefault(); return; }
@@ -907,7 +1002,7 @@ function placeObj(wx,wy){
   
   const occupied=edObjs.some(o=>{
     const ot=td(o.typeId),osc=o.scale||1;
-    if (t.isDeco || ot.isDeco || t.kind === 'saw' || ot.kind === 'saw') return false; 
+    if (t.isDeco || ot.isDeco || t.kind === 'saw' || ot.kind === 'saw' || t.kind === 'trigger' || ot.kind === 'trigger' || t.kind === 'start_pos' || ot.kind === 'start_pos') return false; 
     const ohw=ot.w*TILE*osc/2,ohh=ot.h*TILE*osc/2;
     const thw=sw/2,thh=sh/2;
     return Math.abs(o.x-sx)<(thw+ohw)*0.5&&Math.abs(o.y-sy)<(thh+ohh)*0.5;
@@ -939,14 +1034,19 @@ function updTrigUI() {
   const tId = c === 1 ? selObjs[0].typeId : '';
   const type = tId ? td(tId) : null;
   const b = $('btn-edit-obj');
+  const g = $('btn-edit-group');
 
   if(c !== lastSelCount || tId !== lastSelType) {
     lastSelCount = c; lastSelType = tId;
     closeActiveMenu(); 
     
     if(b) {
-      if(c === 1 && (tId === 'bg_trigger' || tId === 'ground_trigger' || type.isDeco)) b.style.display = 'block';
+      if(c === 1 && (tId === 'bg_trigger' || tId === 'ground_trigger' || tId === 'alpha_trigger' || tId === 'move_trigger' || tId === 'start_pos' || (type && type.isDeco))) b.style.display = 'block';
       else b.style.display = 'none';
+    }
+    if(g) {
+      if(c > 0) g.style.display = 'block';
+      else g.style.display = 'none';
     }
   }
 }
@@ -1074,8 +1174,19 @@ function drawEd(){
         edCtx.arc(0, 0, 0.75 * TILE * sc * camZoom, 0, Math.PI*2); // Precise circular hitbox scale
         edCtx.stroke();
       }
+      else if(t.kind==='trigger' || t.kind==='start_pos'){
+        edCtx.strokeStyle='rgba(100,255,100,.9)';
+        edCtx.lineWidth=2;
+        edCtx.strokeRect(-sw/2,-sh/2,sw,sh); 
+      }
     }
     edCtx.restore();
+
+    if(o.groupId) {
+        edCtx.fillStyle = '#2ECC40';
+        edCtx.font = 'bold 12px Arial';
+        edCtx.fillText(`G${o.groupId}`, scr.x - sw/2, scr.y - sh/2 - 6);
+    }
     if(isSel){edCtx.strokeStyle='#FFD700';edCtx.lineWidth=2;edCtx.strokeRect(scr.x-sw/2-3,scr.y-sh/2-3,sw+6,sh+6);}
   });
 
@@ -1109,7 +1220,7 @@ let gC,gCtx2,gRun=false,gAF=null,curLv,fromEd;
 let player={},gMode='cube',gCamX=0, gCamY=0; 
 let lvEnd=0,dead=false,won=false;
 let jHeld=false,jPrev=false,jumpBuf=0;
-let hbx2=false,orbSt=[],lastT=0;
+let hbx2=false,lastT=0;
 let orbAnims=[]; 
 let deathParticles=[], deathWave=0, respawnTimer=0;
 
@@ -1118,6 +1229,16 @@ function sY(wy) { return wy - gCamY + (gC ? (gC.height / gZoom) / 2 : 0); }
 
 function updateAttemptsDisplay() {
   $('attempts-display').textContent = 'Attempts: ' + attempts;
+}
+
+function getObjPos(obj) {
+    if (!obj.groupId || !gMove[obj.groupId]) return { x: obj.x, y: obj.y };
+    const m = gMove[obj.groupId];
+    return { x: obj.x + m.curX, y: obj.y + m.curY };
+}
+function getObjAlpha(obj) {
+    if (!obj.groupId || !gAlpha[obj.groupId]) return 1;
+    return gAlpha[obj.groupId].current;
 }
 
 function startGame(lv,fe){
@@ -1139,7 +1260,10 @@ function startGame(lv,fe){
   gCtx2=gC.getContext('2d');
   lvEnd=0;lv.objs.forEach(o=>{if(o.x>lvEnd)lvEnd=o.x;});lvEnd+=TILE*8;
   
-  curLv.objs.forEach(o=>{ o.activated=false; });
+  curLv.objs.forEach(o=>{ 
+      o.activated = false; 
+      if(td(o.typeId).kind === 'orb') o.used = false; 
+  });
   let baseCol = hexToRgb(bgColor);
   gBgCol =[...baseCol]; gBgTarget =[...baseCol];
   gBgFadeT = 0; gBgFadeDur = 0;
@@ -1147,7 +1271,6 @@ function startGame(lv,fe){
   const initGnd = hexToRgb(lv.groundColor||'#3a6020');
   gGndCol=[...initGnd]; gGndTarget=[...initGnd]; gGndFadeT=0; gGndFadeDur=0; gGndStartCol=[...initGnd];
 
-  orbSt=lv.objs.filter(o=>o.typeId==='orb').map(o=>({...o,used:false}));
   resetPl(); 
   
   if (currentMusic !== 'none' && audioPlayer.src) { 
@@ -1171,13 +1294,24 @@ function startGame(lv,fe){
 
 function resetPl(){
   player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false};
+  gMode='cube';
+  gAlpha = {};
+  gMove = {};
+  
+  const startPosObj = curLv.objs.find(o => o.typeId === 'start_pos');
+  if(startPosObj) {
+      player.x = startPosObj.x;
+      player.y = startPosObj.y;
+      gMode = startPosObj.startMode || 'cube';
+  }
+
   gZoom = gC ? gC.height / 768 : 1; 
   const logicalW = gC ? gC.width / gZoom : innerWidth;
   
   gCamX = player.x - logicalW * 0.3;
   gCamY = GROUND_Y - 4 * TILE;
-  shipTransAnim=0; shipTransDir=1; prevGMode='cube';
-  orbSt.forEach(o=>{ o.used=false; }); orbAnims=[];
+  shipTransAnim=0; shipTransDir=1; prevGMode=gMode;
+  orbAnims=[];
   pWaveTrail =[]; 
 }
 
@@ -1202,7 +1336,8 @@ function exitGame(){
 }
 function respawn(){
   dead=false;won=false;jHeld=false;jPrev=false;jumpBuf=0;orbAnims=[];
-  hide('win-screen');gMode='cube';resetPl();
+  hide('win-screen');
+  resetPl();
   
   if(fromEd) playTrail =[];
   initAudio();
@@ -1212,7 +1347,10 @@ function respawn(){
   gBgOpac = 1; gBgStartOpac = 1; gBgTargetOpac = 1;
   const initGnd2 = hexToRgb(curLv.groundColor||'#3a6020');
   gGndCol=[...initGnd2]; gGndTarget=[...initGnd2]; gGndFadeT=0; gGndFadeDur=0; gGndStartCol=[...initGnd2];
-  curLv.objs.forEach(o=>{ o.activated=false; });
+  curLv.objs.forEach(o=>{ 
+      o.activated = false; 
+      if(td(o.typeId).kind === 'orb') o.used = false; 
+  });
   lastT=performance.now();gRun=true;gAF=requestAnimationFrame(gLoop);
   
   if (currentMusic !== 'none' && audioPlayer.src) { 
@@ -1265,6 +1403,26 @@ function updateG(dt){
       musicPulse = 1 + (avg / 255) * 0.35;
   } else {
       musicPulse = 1.0;
+  }
+
+  // Handle Triggers Animation
+  for(const gid in gAlpha) {
+      const a = gAlpha[gid];
+      if(a.time < a.dur) {
+          a.time += dt;
+          let p = Math.min(1, a.time / a.dur);
+          a.current = lerp(a.start, a.target, p);
+      }
+  }
+  for(const gid in gMove) {
+      const m = gMove[gid];
+      if(m.time < m.dur) {
+          m.time += dt;
+          let p = Math.min(1, m.time / m.dur);
+          const eased = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2)/2; 
+          m.curX = lerp(m.startX, m.targetX, eased);
+          m.curY = lerp(m.startY, m.targetY, eased);
+      }
   }
 
   player.x+=PLAYER_SPD*dt;
@@ -1368,7 +1526,6 @@ function updateG(dt){
   const pBlueHW = TILE * 0.15, pBlueHH = TILE * 0.15;  
   const pLandHW = TILE * 0.5, pLandHH = TILE * 0.5;    
 
-  // Process slopes first so onSlope is set before block collision checks
   const sortedObjs = [...curLv.objs].sort((a,b) => {
     const ak = td(a.typeId).kind, bk = td(b.typeId).kind;
     return (ak==='slope'?0:1) - (bk==='slope'?0:1);
@@ -1376,13 +1533,14 @@ function updateG(dt){
 
   for(const obj of sortedObjs){
     const t=td(obj.typeId),sc=obj.scale||1;
-    if (t.isDeco) continue; 
+    if (t.isDeco || t.kind === 'start_pos') continue; 
     
+    const pos = getObjPos(obj);
     const hw=t.w*TILE*sc/2,hh=t.h*TILE*sc/2;
-    const dx=Math.abs(player.x-obj.x),dy=Math.abs(player.y-obj.y);
+    const dx=Math.abs(player.x-pos.x),dy=Math.abs(player.y-pos.y);
 
     if(t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave') {
-        if(Math.abs(player.x - obj.x) < hw && Math.abs(player.y - obj.y) < hh) {
+        if(Math.abs(player.x - pos.x) < hw && Math.abs(player.y - pos.y) < hh) {
             if(t.kind==='pcube' && gMode !== 'cube') {
                 gMode='cube'; player.rot=Math.round(player.rot/90)*90;
             } else if(t.kind==='pship' && gMode !== 'ship') {
@@ -1399,46 +1557,65 @@ function updateG(dt){
         continue; 
     }
 
-    if(t.kind==='trigger' && obj.typeId==='bg_trigger' && !obj.activated) {
+    if(t.kind === 'trigger' && !obj.activated) {
+        let isTouch = false;
+        if (obj.touch || obj.bgTouch || obj.gtTouch) isTouch = true;
+        
         let triggerActivated = false;
-        if(obj.bgTouch) {
-            if(dx <= hw + pRedHW && dy <= hh + pRedHH) {
-                triggerActivated = true;
-            }
-        } else {
-            if(player.x >= obj.x) { 
-                triggerActivated = true;
-            }
-        }
-
-        if(triggerActivated) {
-            obj.activated = true;
-            window.gBgStartCol = [...gBgCol];
-            gBgTarget = hexToRgb(obj.bgCol || '#ff0000');
-            gBgFadeDur = parseFloat(obj.bgFade) || 0;
-            gBgFadeT = 0; gBgStartOpac = gBgOpac;
-            gBgTargetOpac = obj.bgOpac !== undefined ? parseFloat(obj.bgOpac) : 1.0;
-            if(gBgFadeDur <= 0) { gBgCol =[...gBgTarget]; gBgOpac = gBgTargetOpac; }
-        }
-        continue; 
-    }
-
-    if(t.kind==='gtrigger' && obj.typeId==='ground_trigger' && !obj.activated) {
-        let triggerActivated = false;
-        if(obj.gtTouch) {
+        if(isTouch) {
             if(dx <= hw + pRedHW && dy <= hh + pRedHH) triggerActivated = true;
         } else {
-            if(player.x >= obj.x) triggerActivated = true;
+            if(player.x >= pos.x) triggerActivated = true;
         }
+
         if(triggerActivated) {
             obj.activated = true;
-            gGndStartCol = [...gGndCol];
-            gGndTarget = hexToRgb(obj.gtCol || '#3a6020');
-            gGndFadeDur = parseFloat(obj.gtFade) || 0;
-            gGndFadeT = 0;
-            if(gGndFadeDur <= 0) { gGndCol = [...gGndTarget]; }
+            if (obj.typeId === 'bg_trigger') {
+                window.gBgStartCol = [...gBgCol];
+                gBgTarget = hexToRgb(obj.bgCol || '#ff0000');
+                gBgFadeDur = parseFloat(obj.bgFade) || 0;
+                gBgFadeT = 0; gBgStartOpac = gBgOpac;
+                gBgTargetOpac = obj.bgOpac !== undefined ? parseFloat(obj.bgOpac) : 1.0;
+                if(gBgFadeDur <= 0) { gBgCol =[...gBgTarget]; gBgOpac = gBgTargetOpac; }
+            } else if (obj.typeId === 'ground_trigger') {
+                gGndStartCol =[...gGndCol];
+                gGndTarget = hexToRgb(obj.gtCol || '#3a6020');
+                gGndFadeDur = parseFloat(obj.gtFade) || 0;
+                gGndFadeT = 0;
+                if(gGndFadeDur <= 0) { gGndCol = [...gGndTarget]; }
+            } else if (obj.typeId === 'alpha_trigger') {
+                const gid = obj.targetGroupId || 1;
+                const dur = parseFloat(obj.fadeTime) || 0;
+                const targetOpacity = obj.opacity !== undefined ? parseFloat(obj.opacity) : 0;
+                if(!gAlpha[gid]) gAlpha[gid] = { current: 1 };
+                if(dur <= 0) {
+                    gAlpha[gid].current = targetOpacity;
+                    gAlpha[gid].time = 1; gAlpha[gid].dur = 1;
+                } else {
+                    gAlpha[gid].start = gAlpha[gid].current;
+                    gAlpha[gid].target = targetOpacity;
+                    gAlpha[gid].time = 0; gAlpha[gid].dur = dur;
+                }
+            } else if (obj.typeId === 'move_trigger') {
+                const gid = obj.targetGroupId || 1;
+                const dur = parseFloat(obj.moveTime) || 0;
+                const mx = (parseFloat(obj.moveX) || 0) * TILE;
+                const my = -(parseFloat(obj.moveY) || 0) * TILE; // Visually negative Y means Up in canvas
+                if(!gMove[gid]) gMove[gid] = { curX: 0, curY: 0 };
+                const currentX = gMove[gid].curX;
+                const currentY = gMove[gid].curY;
+                if(dur <= 0) {
+                    gMove[gid].curX = currentX + mx;
+                    gMove[gid].curY = currentY + my;
+                    gMove[gid].time = 1; gMove[gid].dur = 1;
+                } else {
+                    gMove[gid].startX = currentX; gMove[gid].startY = currentY;
+                    gMove[gid].targetX = currentX + mx; gMove[gid].targetY = currentY + my;
+                    gMove[gid].time = 0; gMove[gid].dur = dur;
+                }
+            }
         }
-        continue;
+        continue; 
     }
 
     if(t.kind==='block'&&t.solid){
@@ -1451,8 +1628,8 @@ function updateG(dt){
 
           const playerEffectiveTop = player.y - pLandHH; 
           const playerEffectiveBottom = player.y + pLandHH;
-          const blockTopEdge = obj.y - hh;
-          const blockBottomEdge = obj.y + hh;
+          const blockTopEdge = pos.y - hh;
+          const blockBottomEdge = pos.y + hh;
 
           if (player.vy < 0 && playerEffectiveTop < blockBottomEdge && player.y > blockTopEdge && dx <= hw + pLandHW) {
               die(); return; 
@@ -1466,8 +1643,8 @@ function updateG(dt){
             const ox = (hw + pLandHW) - dx;
             const oy = (hh + pLandHH) - dy; 
             
-            if (player.y <= obj.y + hh - TILE*0.1 && oy < ox * 2.5) { 
-                player.y = obj.y - hh - pLandHH; 
+            if (player.y <= pos.y + hh - TILE*0.1 && oy < ox * 2.5) { 
+                player.y = pos.y - hh - pLandHH; 
                 player.vy = 0;
                 player.onGround = true;
                 continue; 
@@ -1477,8 +1654,8 @@ function updateG(dt){
     } else if(t.kind==='spike'){
       const rad = -(obj.rot || 0) * Math.PI / 180;
       const cos = Math.cos(rad), sin = Math.sin(rad);
-      const pxLocal = (player.x - obj.x) * cos - (player.y - obj.y) * sin;
-      const pyLocal = (player.x - obj.x) * sin + (player.y - obj.y) * cos;
+      const pxLocal = (player.x - pos.x) * cos - (player.y - pos.y) * sin;
+      const pyLocal = (player.x - pos.x) * sin + (player.y - pos.y) * cos;
       
       const sHW_obj = hw * 0.40; 
       const sHH_obj = hh * 0.60; 
@@ -1505,7 +1682,7 @@ function updateG(dt){
     } else if(t.kind==='slope'){
       const sRad = -(obj.rot || 0) * Math.PI / 180;
       const sCos = Math.cos(sRad), sSin = Math.sin(sRad);
-      const relX = player.x - obj.x, relY = player.y - obj.y;
+      const relX = player.x - pos.x, relY = player.y - pos.y;
       const lx = relX * sCos - relY * sSin; 
       const ly = relX * sSin + relY * sCos; 
 
@@ -1529,9 +1706,9 @@ function updateG(dt){
       } else {
         if(lx < hw && Math.abs(lx) < hw + pLandHW && Math.abs(ly) < hh + pLandHH && player.vy >= 0){
           const surfaceYLocal = hh - (lx + hw) * (hh / hw);
-          const surfaceYWorld = obj.y + sSin * lx + sCos * surfaceYLocal;
+          const surfaceYWorld = pos.y + sSin * lx + sCos * surfaceYLocal;
           const playerBottom = player.y + pLandHH;
-          if(playerBottom >= surfaceYWorld && player.y < obj.y + hh){
+          if(playerBottom >= surfaceYWorld && player.y < pos.y + hh){
             player.y = surfaceYWorld - pLandHH;
             player.vy = 0;
             player.onGround = true;
@@ -1543,10 +1720,9 @@ function updateG(dt){
     } else if(t.kind==='pad'){
       if(player.vy>=0 && dx < hw + pLandHW && dy < hh + pLandHH){player.vy=JUMP_V*1.7;player.onGround=false;}
     } else if(t.kind==='orb'){
-      const os=orbSt.find(s=>s.x===obj.x&&s.y===obj.y);
-      if(os&&!os.used&&jHeld && dx < hw + pLandHW && dy < hh + pLandHH){
-        player.vy=JUMP_V; player.onGround=false; os.used=true;
-        orbAnims.push({x:obj.x,y:obj.y,t:0});
+      if(!obj.used && jHeld && dx < hw + pLandHW && dy < hh + pLandHH){
+        player.vy=JUMP_V; player.onGround=false; obj.used=true;
+        orbAnims.push({obj:obj,t:0});
       }
     }
   }
@@ -1672,11 +1848,20 @@ function drawG(){
 
   curLv.objs.forEach(obj=>{
     const t=td(obj.typeId),sc=obj.scale||1;
-    const sx=sX(obj.x),sy=sY(obj.y); 
+    if (t.kind === 'start_pos' && !fromEd) return; // Hide start pos in active play, maybe keep in test? Hide it always during game.
+    if (t.kind === 'start_pos') return;
+
+    const pos = getObjPos(obj);
+    const alpha = getObjAlpha(obj);
+    if(alpha <= 0) return; // Invisible
+
+    const sx=sX(pos.x),sy=sY(pos.y); 
     if(sx<-TILE*4||sx>logicalW+TILE*4)return;
     const rot=(obj.rot||0)*Math.PI/180;
     let sw=t.w*TILE*sc, sh=t.h*TILE*sc;
-    gCtx2.save();gCtx2.translate(sx,sy);
+    gCtx2.save();
+    gCtx2.globalAlpha *= alpha;
+    gCtx2.translate(sx,sy);
     if (t.kind === 'saw') gCtx2.rotate(rot + performance.now() / -250); // Spin smoothly
     else gCtx2.rotate(rot);
 
@@ -1689,7 +1874,7 @@ function drawG(){
 
     if (isOrb) {
         let currentPulse = musicPulse;
-        const anim = orbAnims.find(a => a.x === obj.x && a.y === obj.y);
+        const anim = orbAnims.find(a => a.obj === obj);
         
         if (anim) {
             let tAnim = anim.t;
@@ -1740,7 +1925,7 @@ function drawG(){
     }
     
     if(t.kind==='orb'){
-      const anim=orbAnims.find(a=>a.x===obj.x&&a.y===obj.y);
+      const anim=orbAnims.find(a=>a.obj === obj);
       if(anim && anim.t <= 0.28){
         let ringP = anim.t / 0.28;
         const ringScale = 1 + ringP * 1.0; 
