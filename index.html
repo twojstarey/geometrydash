@@ -1,3 +1,4 @@
+--- START OF FILE ai_studio_code (60).html ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -255,7 +256,7 @@ const TILE=64, GROUND_Y=9*TILE;
 const CEIL_Y = -3*TILE; 
 const SHIP_TUNNEL_H = GROUND_Y - CEIL_Y; 
 const GROUND_TS=250;
-const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1250;
+const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1270;
 const SHIP_GRAV=2800, SHIP_THRUST=-3500, SHIP_MAXVY=1080;
 const BG_PAR=0.12;
 const BG_TS=1400;
@@ -268,6 +269,9 @@ const TRANS_DUR = 0.55;
 let prevGMode = 'cube';  
 let playTrail =[];
 let pWaveTrail =[]; 
+let tunnelFloor = GROUND_Y;
+let tunnelCeil = CEIL_Y;
+let gravityDir = 1;
 
 const SRC={
   bg:'https://i.imgur.com/PsXJdC6.png',
@@ -288,6 +292,8 @@ const SRC={
   cube_port:'https://i.imgur.com/qVh7VIT.png',
   ship_port:'https://i.imgur.com/zxT7Z80.png',
   wave_port:'https://i.imgur.com/HJWopPf.png',
+  grav_rev_port:'https://i.imgur.com/DDc7zyq.png',
+  grav_norm_port:'https://i.imgur.com/naqFZGf.png',
   orb:'https://i.imgur.com/ysH0qCh.png',
   deco1:'https://i.imgur.com/Mp27IWo.png',
   deco2:'https://i.imgur.com/omTYQuo.png',
@@ -337,6 +343,8 @@ const TYPES=[
   {id:'cube_port',lbl:'Cube\nPortal',img:'cube_port',w:1.4,  h:2.7, kind:'pcube', solid:false},
   {id:'ship_port',lbl:'Ship\nPortal',img:'ship_port',w:1.4,  h:2.7, kind:'pship', solid:false},
   {id:'wave_port',lbl:'Wave\nPortal',img:'wave_port',w:1.4,  h:2.7, kind:'pwave', solid:false},
+  {id:'grav_rev_port',lbl:'Rev Grav\nPortal',img:'grav_rev_port',w:1.4,h:2.7,kind:'pgravrev',solid:false},
+  {id:'grav_norm_port',lbl:'Norm Grav\nPortal',img:'grav_norm_port',w:1.4,h:2.7,kind:'pgravnorm',solid:false},
   {id:'bg_trigger',lbl:'BG\nTrigger',img:'bg_trigger',w:0.8, h:1,   kind:'trigger',solid:false},
   {id:'ground_trigger',lbl:'GND\nTrigger',img:'ground_trigger',w:0.8,h:1,kind:'trigger',solid:false},
   {id:'alpha_trigger',lbl:'Alpha\nTrigger',img:'alpha_trigger',w:1.2,h:1,kind:'trigger',solid:false},
@@ -1028,7 +1036,7 @@ function placeObj(wx,wy){
   saveState();
   const newObj = {typeId:t.id,x:sx,y:sy,rot:0,scale:sc,groupId:0};
   edObjs.push(newObj);
-  selObjs = [newObj]; 
+  selObjs =[newObj]; 
 }
 function getAt(wx,wy){
   for(let i=edObjs.length-1;i>=0;i--){
@@ -1181,8 +1189,8 @@ function drawEd(){
       else if(t.kind==='spike'){
         edCtx.strokeStyle='rgba(255,80,80,.9)';
         edCtx.lineWidth=2;
-        const sHW_visual = (sw/2) * 0.40;  
-        const sHH_visual = (sh/2) * 0.60; 
+        const sHW_visual = (sw/2) * 0.25;  
+        const sHH_visual = (sh/2) * 0.35; 
         const spikeCenterY_visual = (sh/2) - sHH_visual;
         edCtx.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2);
       }
@@ -1242,7 +1250,7 @@ function startGame(lv,fe){
   curLv=lv;fromEd=fe;
   bgColor=lv.bg||'#1a2a6c'; groundColor=lv.gr||'#0055ff';
   $('g-title').textContent=lv.name;
-  hbx2=false;gMode='cube';dead=false;won=false;jHeld=false;jPrev=false;jumpBuf=0;
+  hbx2=false;gMode='cube'; gravityDir=1; dead=false;won=false;jHeld=false;jPrev=false;jumpBuf=0;
   orbAnims=[]; padEffects=[];
   deathParticles=[]; deathWave=0; respawnTimer=0;
   
@@ -1263,7 +1271,7 @@ function startGame(lv,fe){
       o.offsetY = 0;
       o.renderOpac = 1;
   });
-  window.activeMoves = [];
+  window.activeMoves =[];
   window.activeAlphas =[];
 
   let baseCol = hexToRgb(bgColor);
@@ -1294,12 +1302,17 @@ function startGame(lv,fe){
 }
 
 function resetPl(){
+  gravityDir = 1;
   player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false};
-  gZoom = gC ? gC.height / 768 : 1; 
+  gZoom = gC ? gC.height / 850 : 1; 
   const logicalW = gC ? gC.width / gZoom : innerWidth;
+  const logicalH = gC ? gC.height / gZoom : 850;
+  
+  tunnelFloor = GROUND_Y;
+  tunnelCeil = CEIL_Y;
   
   gCamX = player.x - logicalW * 0.3;
-  gCamY = GROUND_Y - 4 * TILE;
+  gCamY = tunnelFloor - logicalH * 0.25; 
   shipTransAnim=0; shipTransDir=1; prevGMode='cube';
   orbSt.forEach(o=>{ o.used=false; }); 
   orbAnims=[]; padEffects=[];
@@ -1322,7 +1335,7 @@ function exitGame(){
 }
 function respawn(){
   dead=false;won=false;jHeld=false;jPrev=false;jumpBuf=0;
-  hide('win-screen');gMode='cube';resetPl();
+  hide('win-screen');gMode='cube'; gravityDir=1; resetPl();
   
   if(fromEd) playTrail =[];
   initAudio();
@@ -1386,6 +1399,7 @@ function updateDeath(dt) {
 function updateG(dt){
   gZoom = gC.height / 850; 
   const logicalW = gC.width / gZoom;
+  const logicalH = gC.height / gZoom;
 
   if (fromEd) playTrail.push({x: player.x, y: player.y});
 
@@ -1444,19 +1458,20 @@ function updateG(dt){
   }
   if(shipTransAnim > 0) shipTransAnim = Math.max(0, shipTransAnim - dt);
 
-  const cubeCamY = GROUND_Y - 4 * TILE; 
-  const shipMid = (GROUND_Y + CEIL_Y) / 2;
-  
-  if(!isTunnel && shipTransAnim <= 0){
-    gCamY = cubeCamY;
-  } else if(isTunnel && shipTransAnim <= 0){
-    gCamY = shipMid;
+  // Smooth Camera Follow
+  let targetCamY = player.y;
+  if (isTunnel) {
+      targetCamY = (tunnelFloor + tunnelCeil) / 2;
   } else {
-    const tRaw2 = shipTransDir===1 ? 1-(shipTransAnim/TRANS_DUR) : (shipTransAnim/TRANS_DUR);
-    const tE2 = Math.min(1,Math.max(0,tRaw2));
-    const ea2 = tE2<0.5?2*tE2*tE2:1-Math.pow(-2*tE2+2,2)/2;
-    gCamY = cubeCamY + (shipMid - cubeCamY) * ea2;
+      if (gravityDir === 1) {
+          const maxCam = tunnelFloor - logicalH * 0.25;
+          if (targetCamY > maxCam) targetCamY = maxCam;
+      } else {
+          const minCam = tunnelCeil + logicalH * 0.25;
+          if (targetCamY < minCam) targetCamY = minCam;
+      }
   }
+  gCamY += (targetCamY - gCamY) * Math.min(1, 8 * dt);
 
   if(gBgFadeDur > 0) {
     gBgFadeT += dt;
@@ -1473,21 +1488,20 @@ function updateG(dt){
     for(let i=0; i<3; i++) gGrCol[i] = lerp(window.gGrStartCol[i], gGrTarget[i], p);
   }
 
-  const pLandHH = TILE * 0.5;
-
   // --- Physics Update ---
   if(gMode === 'cube') {
-    player.vy += GRAVITY * dt;
+    player.vy += GRAVITY * gravityDir * dt;
     player.y += player.vy * dt;
     if(jumpBuf > 0) jumpBuf -= dt;
     
     player.onGround = false;
     player.onSlope = false;
-    let landingY = Infinity;
+    let landingY = gravityDir === 1 ? Infinity : -Infinity;
     let onSlopeThisFrame = false;
 
-    let pBottom = player.y + pLandHH;
-    let pPrevBottom = player.y - player.vy*dt + pLandHH;
+    let pLandHH = TILE * 0.5;
+    let pEdge = player.y + pLandHH * gravityDir;
+    let pPrevEdge = player.y - player.vy*dt + pLandHH * gravityDir;
 
     for(const obj of curLv.objs) {
         const t = td(obj.typeId);
@@ -1495,64 +1509,77 @@ function updateG(dt){
 
         const ox = obj.x + (obj.offsetX || 0);
         const oy = obj.y + (obj.offsetY || 0);
-
         const sc = obj.scale || 1;
         const hw = t.w * TILE * sc / 2, hh = t.h * TILE * sc / 2;
 
         if (Math.abs(player.x - ox) > hw + TILE/2) continue; 
 
-        let surfaceY = Infinity;
-        let isSlope = false;
-
+        let isSlope = false; 
         if (t.kind === 'block') {
-            surfaceY = oy - hh;
-        }
-
-        if (pBottom >= surfaceY && pPrevBottom <= surfaceY + 1) { 
-            if (surfaceY < landingY) {
-                landingY = surfaceY;
-                onSlopeThisFrame = isSlope;
+            let surfaceY = oy - hh * gravityDir;
+            if (gravityDir === 1) {
+                if (pEdge >= surfaceY && pPrevEdge <= surfaceY + 1) {
+                    if (surfaceY < landingY) { landingY = surfaceY; onSlopeThisFrame = isSlope; }
+                }
+            } else {
+                if (pEdge <= surfaceY && pPrevEdge >= surfaceY - 1) {
+                    if (surfaceY > landingY) { landingY = surfaceY; onSlopeThisFrame = isSlope; }
+                }
             }
         }
     }
 
-    if (pBottom >= GROUND_Y && pPrevBottom <= GROUND_Y + 1) {
-        if (GROUND_Y < landingY) {
-            landingY = GROUND_Y;
-            onSlopeThisFrame = false;
+    if (gravityDir === 1) {
+        if (pEdge >= GROUND_Y && pPrevEdge <= GROUND_Y + 1) {
+            if (GROUND_Y < landingY) { landingY = GROUND_Y; onSlopeThisFrame = false; }
+        }
+        if (landingY !== Infinity) {
+            player.y = landingY - pLandHH;
+            player.vy = 0; player.onGround = true; player.onSlope = onSlopeThisFrame;
+        }
+    } else {
+        if (pEdge <= tunnelCeil && pPrevEdge >= tunnelCeil - 1) {
+            if (tunnelCeil > landingY) { landingY = tunnelCeil; onSlopeThisFrame = false; }
+        }
+        if (landingY !== -Infinity) {
+            player.y = landingY + pLandHH;
+            player.vy = 0; player.onGround = true; player.onSlope = onSlopeThisFrame;
         }
     }
 
-    if (landingY !== Infinity) {
-        player.y = landingY - pLandHH;
-        player.vy = 0;
-        player.onGround = true;
-        player.onSlope = onSlopeThisFrame;
-    }
-
-    if (!player.onGround) player.rot += 420 * dt;
+    if (!player.onGround) player.rot += 420 * dt * gravityDir;
 
   } else if (gMode === 'ship') {
-    if(jHeld)player.vy+=SHIP_THRUST*dt;else player.vy+=SHIP_GRAV*dt;
-    player.vy=Math.max(-SHIP_MAXVY,Math.min(SHIP_MAXVY,player.vy));
-    player.y+=player.vy*dt;
+    player.vy += (jHeld ? SHIP_THRUST : SHIP_GRAV) * gravityDir * dt;
+    player.vy = Math.max(-SHIP_MAXVY, Math.min(SHIP_MAXVY, player.vy));
+    player.y += player.vy * dt;
     
-    if(player.y - TILE*0.4 < CEIL_Y){ player.y=CEIL_Y+TILE*0.4; player.vy=Math.max(0,player.vy); }
-    if(player.y + TILE*0.4 >= GROUND_Y){ player.y=GROUND_Y-TILE*0.4; player.vy=0; player.onGround=true; }
-    else player.onGround=false;
+    if(player.y - TILE*0.4 <= tunnelCeil){
+        player.y = tunnelCeil + TILE*0.4;
+        if(player.vy < 0 && gravityDir === 1) player.vy = 0;
+        if(player.vy > 0 && gravityDir === -1) player.vy = 0;
+        if(gravityDir === -1) player.onGround = true;
+    }
+    if(player.y + TILE*0.4 >= tunnelFloor){
+        player.y = tunnelFloor - TILE*0.4;
+        if(player.vy > 0 && gravityDir === 1) player.vy = 0;
+        if(player.vy < 0 && gravityDir === -1) player.vy = 0;
+        if(gravityDir === 1) player.onGround = true;
+    }
+    if (player.y - TILE*0.4 > tunnelCeil && player.y + TILE*0.4 < tunnelFloor) player.onGround = false;
     
-    const tgt=Math.max(-50,Math.min(50,player.vy*0.05));
-    player.rot+=(tgt-player.rot)*0.22;
+    const tgt = Math.max(-50, Math.min(50, player.vy * 0.05));
+    player.rot += (tgt - player.rot) * 0.22;
   } else if (gMode === 'wave') {
-    player.vy = jHeld ? -PLAYER_SPD : PLAYER_SPD;
+    player.vy = (jHeld ? -PLAYER_SPD : PLAYER_SPD) * gravityDir;
     player.y += player.vy * dt;
     
     let isCeil = false, isFloor = false;
-    if(player.y - TILE*0.4 <= CEIL_Y){ player.y=CEIL_Y+TILE*0.4; isCeil=true; }
-    if(player.y + TILE*0.4 >= GROUND_Y){ player.y=GROUND_Y-TILE*0.4; player.onGround=true; isFloor=true; }
-    else player.onGround=false;
+    if(player.y - TILE*0.4 <= tunnelCeil){ player.y=tunnelCeil+TILE*0.4; isCeil=true; if(gravityDir===-1) player.onGround=true; }
+    if(player.y + TILE*0.4 >= tunnelFloor){ player.y=tunnelFloor-TILE*0.4; isFloor=true; if(gravityDir===1) player.onGround=true; }
+    if (!isCeil && !isFloor) player.onGround = false;
 
-    let targetRot = jHeld ? -45 : 45;
+    let targetRot = (jHeld ? -45 : 45) * gravityDir;
     if (isFloor || isCeil) targetRot = 0;
 
     const rotSpeed = 900; 
@@ -1569,8 +1596,9 @@ function updateG(dt){
   while(pWaveTrail.length > 0 && pWaveTrail[0].x < gCamX - TILE*2) pWaveTrail.shift();
 
   // --- Collision and Interaction Loop ---
-  const pRedHW = TILE * 0.50, pRedHH = TILE * 0.50;    
+  const pRedHW = TILE * 0.35, pRedHH = TILE * 0.35;    
   const pBlueHW = TILE * 0.15, pBlueHH = TILE * 0.15;  
+  let pLandHH = TILE * 0.5;
 
   for(const obj of curLv.objs){
     const t=td(obj.typeId),sc=obj.scale||1;
@@ -1582,17 +1610,38 @@ function updateG(dt){
     const hw=t.w*TILE*sc/2,hh=t.h*TILE*sc/2;
     const dx=Math.abs(player.x-ox),dy=Math.abs(player.y-oy);
 
-    if(t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave') {
-        if(dx < hw && dy < hh) {
-            if(t.kind==='pcube' && gMode !== 'cube') {
-                gMode='cube'; player.rot=Math.round(player.rot/90)*90;
-            } else if(t.kind==='pship' && gMode !== 'ship') {
-                gMode='ship'; player.vy=0;
-                player.rot = player.rot % 360; if(player.rot > 180) player.rot -= 360; else if(player.rot < -180) player.rot += 360;
-            } else if(t.kind==='pwave' && gMode !== 'wave') {
-                gMode='wave'; player.vy=0;
-                player.rot = player.rot % 360; if(player.rot > 180) player.rot -= 360; else if(player.rot < -180) player.rot += 360;
-                pWaveTrail =[{x: player.x, y: player.y}];
+    if(t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave' || t.kind==='pgravrev' || t.kind==='pgravnorm') {
+        if(dx < hw && dy < hh && !obj.activated) {
+            obj.activated = true;
+            if(t.kind==='pcube') {
+                if (gMode !== 'cube') {
+                    gMode='cube'; player.rot=Math.round(player.rot/90)*90;
+                }
+                tunnelFloor = GROUND_Y;
+                tunnelCeil = CEIL_Y;
+            } else if(t.kind==='pship') {
+                if (gMode !== 'ship') {
+                    gMode='ship'; player.vy=0;
+                    player.rot = player.rot % 360; if(player.rot > 180) player.rot -= 360; else if(player.rot < -180) player.rot += 360;
+                }
+                let py = Math.round(oy / TILE) * TILE;
+                tunnelFloor = py + 6 * TILE;
+                if(tunnelFloor > GROUND_Y) { tunnelFloor = GROUND_Y; tunnelCeil = tunnelFloor - 12 * TILE; }
+                else tunnelCeil = py - 6 * TILE;
+            } else if(t.kind==='pwave') {
+                if (gMode !== 'wave') {
+                    gMode='wave'; player.vy=0;
+                    player.rot = player.rot % 360; if(player.rot > 180) player.rot -= 360; else if(player.rot < -180) player.rot += 360;
+                    pWaveTrail =[{x: player.x, y: player.y}];
+                }
+                let py = Math.round(oy / TILE) * TILE;
+                tunnelFloor = py + 6 * TILE;
+                if(tunnelFloor > GROUND_Y) { tunnelFloor = GROUND_Y; tunnelCeil = tunnelFloor - 12 * TILE; }
+                else tunnelCeil = py - 6 * TILE;
+            } else if(t.kind==='pgravrev' && gravityDir !== -1) {
+                gravityDir = -1; player.vy = 0;
+            } else if(t.kind==='pgravnorm' && gravityDir !== 1) {
+                gravityDir = 1; player.vy = 0;
             }
         }
     } else if (t.kind === 'trigger') {
@@ -1654,14 +1703,18 @@ function updateG(dt){
             if (dx < hw + TILE*0.3 && dy < hh + TILE*0.3) { die(); return; }
         } else {
             if (dx < hw + pBlueHW && dy < hh + pBlueHH) { die(); return; }
-            if (player.vy < 0 && dy < hh + pLandHH && dx < hw + pLandHH && player.y > oy) { die(); return; }
+            if (gravityDir === 1) {
+                if (player.vy < 0 && dy < hh + pLandHH && dx < hw + pLandHH && player.y > oy) { die(); return; }
+            } else {
+                if (player.vy > 0 && dy < hh + pLandHH && dx < hw + pLandHH && player.y < oy) { die(); return; }
+            }
         }
     } else if(t.kind==='spike'){
       const rad = -(obj.rot || 0) * Math.PI / 180;
       const cos = Math.cos(rad), sin = Math.sin(rad);
       const pxLocal = (player.x - ox) * cos - (player.y - oy) * sin;
       const pyLocal = (player.x - ox) * sin + (player.y - oy) * cos;
-      const sHW_obj = hw * 0.40, sHH_obj = hh * 0.60, spikeCenterYOffset = hh - sHH_obj;
+      const sHW_obj = hw * 0.25, sHH_obj = hh * 0.35, spikeCenterYOffset = hh - sHH_obj;
       if(Math.abs(pxLocal) <= sHW_obj + pRedHW && Math.abs(pyLocal - spikeCenterYOffset) <= sHH_obj + pRedHH){ die(); return; }
     } else if(t.kind==='saw'){
         let dist = Math.hypot(player.x - ox, player.y - oy);
@@ -1669,15 +1722,15 @@ function updateG(dt){
         let sawR = TILE * 0.75 * sc;
         if(dist < playerR + sawR) { die(); return; }
     } else if(t.kind==='pad'){
-      if(player.vy>=0 && dx < hw + pLandHH && dy < hh + pLandHH){
-          player.vy=-1250; 
+      if(player.vy * gravityDir >= 0 && dx < hw + pLandHH && dy < hh + pLandHH){
+          player.vy = -1250 * gravityDir; 
           player.onGround=false;
           padEffects.push({x: ox, y: oy, t: 0});
       }
     } else if(t.kind==='orb'){
       const os=orbSt.find(s=>s.x===obj.x&&s.y===obj.y);
       if(os&&!os.used&&jHeld && dx < hw + pLandHH && dy < hh + pLandHH){
-        player.vy=JUMP_V; player.onGround=false; os.used=true;
+        player.vy = JUMP_V * gravityDir; player.onGround=false; os.used=true;
         orbAnims.push({x:obj.x,y:obj.y,t:0});
       }
     }
@@ -1699,7 +1752,7 @@ function updateG(dt){
         if(Math.abs(diff) < 0.5) player.rot = snapped;
       }
       if(jHeld||jumpBuf>0){ 
-          player.vy=JUMP_V; 
+          player.vy = JUMP_V * gravityDir; 
           player.onGround=false; 
           jumpBuf=0; 
           player.y += player.vy * dt; 
@@ -1755,28 +1808,23 @@ function drawG(){
   const transT = Math.min(1, Math.max(0, rawT));
   const eased = transT < 0.5 ? 2*transT*transT : 1-Math.pow(-2*transT+2,2)/2;
 
-  const finalFloorY = sY(GROUND_Y);   
-  const finalCeilY  = sY(CEIL_Y);     
-
-  const startCeilY = -GROUND_TS;
-  const animCeilY  = startCeilY + (finalCeilY - startCeilY) * eased;
-  const animFloorY = finalFloorY; 
+  const baseFloorY = sY(GROUND_Y);   
 
   let curGrHexCol = rgbToHex(gGrCol[0], gGrCol[1], gGrCol[2]);
 
   gCtx2.fillStyle = '#000';
-  gCtx2.fillRect(0, animFloorY + GROUND_TS, logicalW, logicalH);
+  gCtx2.fillRect(0, baseFloorY + GROUND_TS, logicalW, logicalH);
 
   gCtx2.fillStyle = curGrHexCol;
-  gCtx2.fillRect(0, animFloorY, logicalW, GROUND_TS);
+  gCtx2.fillRect(0, baseFloorY, logicalW, GROUND_TS);
   if(ok(IM.ground)){
     gCtx2.globalCompositeOperation = 'multiply';
     const off=-(gCamX%GROUND_TS)-GROUND_TS;
     for(let tx=off;tx<logicalW+GROUND_TS;tx+=GROUND_TS)
-      gCtx2.drawImage(IM.ground, tx, animFloorY, GROUND_TS, GROUND_TS);
+      gCtx2.drawImage(IM.ground, tx, baseFloorY, GROUND_TS, GROUND_TS);
     gCtx2.globalCompositeOperation = 'source-over';
   } else {
-    gCtx2.fillRect(0, animFloorY, logicalW, GROUND_TS);
+    gCtx2.fillRect(0, baseFloorY, logicalW, GROUND_TS);
   }
 
   let gGrad = gCtx2.createLinearGradient(0, 0, logicalW, 0);
@@ -1785,10 +1833,13 @@ function drawG(){
   gGrad.addColorStop(0.95, 'rgba(255,255,255,1)');
   gGrad.addColorStop(1, 'rgba(255,255,255,0)');
   gCtx2.fillStyle = gGrad;
-  gCtx2.fillRect(0, animFloorY - 2, logicalW, 4);
+  gCtx2.fillRect(0, baseFloorY - 2, logicalW, 4);
 
   if(gMode==='ship' || gMode==='wave' || shipTransAnim > 0){
+    let startCeilY = sY(tunnelCeil) - logicalH;
+    let animCeilY = startCeilY + (sY(tunnelCeil) - startCeilY) * eased;
     let ceilTop = animCeilY - GROUND_TS;
+    
     gCtx2.fillStyle = '#000';
     if(ceilTop > 0) {
         gCtx2.fillRect(0, 0, logicalW, ceilTop);
@@ -1805,12 +1856,31 @@ function drawG(){
         gCtx2.drawImage(IM.ground, tx, -animCeilY, GROUND_TS, GROUND_TS);
       gCtx2.restore();
       gCtx2.globalCompositeOperation = 'source-over';
-    } else {
-      gCtx2.fillRect(0, ceilTop, logicalW, GROUND_TS);
     }
 
     gCtx2.fillStyle = gGrad;
     gCtx2.fillRect(0, animCeilY - 2, logicalW, 4);
+    
+    if (tunnelFloor < GROUND_Y) {
+        let startTFloorY = sY(tunnelFloor) + logicalH;
+        let animTFloorY = startTFloorY + (sY(tunnelFloor) - startTFloorY) * eased;
+        
+        gCtx2.fillStyle = '#000';
+        gCtx2.fillRect(0, animTFloorY + GROUND_TS, logicalW, logicalH);
+
+        gCtx2.fillStyle = curGrHexCol;
+        gCtx2.fillRect(0, animTFloorY, logicalW, GROUND_TS);
+        if(ok(IM.ground)){
+          gCtx2.globalCompositeOperation = 'multiply';
+          const off=-(gCamX%GROUND_TS)-GROUND_TS;
+          for(let tx=off;tx<logicalW+GROUND_TS;tx+=GROUND_TS)
+            gCtx2.drawImage(IM.ground, tx, animTFloorY, GROUND_TS, GROUND_TS);
+          gCtx2.globalCompositeOperation = 'source-over';
+        }
+
+        gCtx2.fillStyle = gGrad;
+        gCtx2.fillRect(0, animTFloorY - 2, logicalW, 4);
+    }
   }
 
   curLv.objs.forEach(obj=>{
@@ -1920,7 +1990,7 @@ function drawG(){
       if(t.kind==='block'&&t.solid){ gCtx2.strokeStyle='rgba(60,80,255,.9)'; gCtx2.lineWidth=2; gCtx2.strokeRect(-sw/2,-sh/2,sw,sh); }
       else if(t.kind==='spike'){ 
         gCtx2.strokeStyle='rgba(255,80,80,.9)'; gCtx2.lineWidth=2; 
-        const sHW_visual=(sw/2)*0.40, sHH_visual=(sh/2)*0.60;
+        const sHW_visual=(sw/2)*0.25, sHH_visual=(sh/2)*0.35;
         const spikeCenterY_visual = (sh/2) - sHH_visual;
         gCtx2.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2); 
       }
@@ -1928,7 +1998,7 @@ function drawG(){
         gCtx2.strokeStyle='rgba(255,80,80,.9)'; gCtx2.lineWidth=2;
         gCtx2.beginPath(); gCtx2.arc(0,0,TILE*0.75*sc,0,Math.PI*2); gCtx2.stroke();
       }
-      else if(t.kind==='trigger' || t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave'){ gCtx2.strokeStyle='rgba(100,255,100,.9)'; gCtx2.lineWidth=2; gCtx2.strokeRect(-sw/2,-sh/2,sw,sh); }
+      else if(t.kind==='trigger' || t.kind==='pcube' || t.kind==='pship' || t.kind==='pwave' || t.kind==='pgravrev' || t.kind==='pgravnorm'){ gCtx2.strokeStyle='rgba(100,255,100,.9)'; gCtx2.lineWidth=2; gCtx2.strokeRect(-sw/2,-sh/2,sw,sh); }
     }
     gCtx2.restore();
     gCtx2.globalAlpha = 1; 
@@ -1952,7 +2022,7 @@ function drawG(){
     
     const startX = TILE * 10;
     const textX = sX(startX);
-    const textY = sY(GROUND_Y - TILE * 5); 
+    const textY = sY(tunnelFloor - TILE * 5); 
 
     gCtx2.strokeText(text, textX, textY);
     gCtx2.fillText(text, textX, textY);
@@ -1993,6 +2063,8 @@ function drawG(){
 
   if (!dead) {
       gCtx2.save(); gCtx2.translate(px,py); gCtx2.rotate(player.rot*Math.PI/180);
+      if (gravityDir === -1) gCtx2.scale(1, -1);
+      
       if(gMode==='ship'){
         const ci=IM.cube, si=IM.ship;
         if(ok(si)) gCtx2.drawImage(si, -TILE*0.8, -TILE*0.4, TILE*1.6, TILE*0.8);
@@ -2045,3 +2117,4 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
+--- END OF FILE ai_studio_code (60).html ---
