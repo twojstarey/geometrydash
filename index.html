@@ -133,7 +133,11 @@ body{background:#000;font-family:'Pusab',Arial,sans-serif;color:#fff;overflow:hi
   <div class="ui">
     <h2>MY LEVELS</h2>
     <div id="levels-list"></div>
-    <button class="back-btn" onclick="showMenu()">← BACK</button>
+    <div style="display:flex; justify-content:center; gap:10px; margin-top:13px;">
+      <button class="back-btn" style="margin:0;" onclick="document.getElementById('import-level-input').click()">📥 IMPORT</button>
+      <button class="back-btn" style="margin:0;" onclick="showMenu()">← BACK</button>
+    </div>
+    <input type="file" id="import-level-input" accept=".json" style="display:none;" onchange="handleImportLevel(event)">
   </div>
 </div>
 
@@ -506,11 +510,54 @@ function renderList(){
       <div class="lv-btns">
         <button class="lb lp" onclick="playLevel(${i})">▶</button>
         <button class="lb le" onclick="editLevel(${i})">✏</button>
+        <button class="lb" style="background:#f39c12;color:#fff;" onclick="exportLevel(${i})">⬇</button>
         <button class="lb ld" onclick="delLevel(${i})">✖</button>
       </div>
     </div>`).join('');
 }
 function delLevel(i){if(!confirm('Delete?'))return;const {levels, music}=getLS();levels.splice(i,1);setLS({levels: levels, music: music});renderList();}
+
+function exportLevel(i) {
+    const { levels } = getLS();
+    const lv = levels[i];
+    if (!lv) return;
+    const dataStr = JSON.stringify(lv);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (lv.name || "level").replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function handleImportLevel(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedLevel = JSON.parse(e.target.result);
+            if (!importedLevel || typeof importedLevel !== 'object' || !Array.isArray(importedLevel.objs)) {
+                throw new Error("Invalid level format.");
+            }
+            
+            const { levels, music } = getLS();
+            levels.push(importedLevel);
+            setLS({ levels: levels, music: music });
+            renderList();
+            alert("Level imported successfully!");
+        } catch (err) {
+            console.error(err);
+            alert("Error importing level: " + err.message);
+        }
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
 
 // ── EDITOR STATE ──
 let edObjs=[],edIdx=-1,edTool='place',selType=TYPES[0];
@@ -1623,7 +1670,7 @@ function updateG(dt){
         if(dist < playerR + sawR) { die(); return; }
     } else if(t.kind==='pad'){
       if(player.vy>=0 && dx < hw + pLandHH && dy < hh + pLandHH){
-          player.vy=-2015; 
+          player.vy=-1250; 
           player.onGround=false;
           padEffects.push({x: ox, y: oy, t: 0});
       }
@@ -1761,6 +1808,9 @@ function drawG(){
     } else {
       gCtx2.fillRect(0, ceilTop, logicalW, GROUND_TS);
     }
+
+    gCtx2.fillStyle = gGrad;
+    gCtx2.fillRect(0, animCeilY - 2, logicalW, 4);
   }
 
   curLv.objs.forEach(obj=>{
@@ -1838,16 +1888,16 @@ function drawG(){
         if (drawGlow) gCtx2.shadowBlur = 0;
         
         if (t.id === 'alpha_trigger' || t.id === 'move_trigger') {
-          gCtx2.font = `${28 * sc}px Pusab, Arial`;
+          gCtx2.font = `${32 * sc * camZoom}px Pusab, Arial`;
           gCtx2.textAlign = 'center';
           gCtx2.textBaseline = 'middle';
-          gCtx2.lineWidth = 4 * sc;
+          gCtx2.lineWidth = 5 * sc * camZoom;
           gCtx2.strokeStyle = '#000';
           gCtx2.fillStyle = '#FFF';
-          let txtX = drawSw * 0;
-          let txtY = drawSh * 0.15;
-          gCtx2.strokeText(obj.targetId || 0, txtX, txtY);
-          gCtx2.fillText(obj.targetId || 0, txtX, txtY);
+          let txtX = sw * -0.15;
+          let txtY = sh * 0.15;
+          gCtx2.strokeText(o.targetId || 0, txtX, txtY);
+          gCtx2.fillText(o.targetId || 0, txtX, txtY);
         }
       }
       else{gCtx2.fillStyle='#555';gCtx2.fillRect(-drawSw/2,-drawSh/2,drawSw,drawSh);}
@@ -1899,8 +1949,10 @@ function drawG(){
     gCtx2.fillStyle = '#FFF';
 
     const text = "ATTEMPT " + attempts;
-    const textX = sX(TILE * 10);
-    const textY = sY(CEIL_Y + (GROUND_Y - CEIL_Y) / 2);
+    
+    const startX = TILE * 10;
+    const textX = sX(startX);
+    const textY = sY(GROUND_Y - TILE * 5); 
 
     gCtx2.strokeText(text, textX, textY);
     gCtx2.fillText(text, textX, textY);
