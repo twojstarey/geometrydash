@@ -107,11 +107,10 @@ body{background:#000;font-family:'Pusab',Arial,sans-serif;color:#fff;overflow:hi
 #g-back{position:absolute;top:8px;left:7px;padding:6px 12px;background:rgba(0,0,0,.68);border:2px solid #fff;color:#fff;font-size:12px;font-weight:900;border-radius:8px;cursor:pointer;z-index:10;pointer-events:all;}
 #g-title{position:absolute;top:12px;left:75px;font-size:17px;font-weight:900;text-shadow:2px 2px 0 #000;white-space:nowrap;}
 
-#prog-wrap{position:absolute;top:15px;left:50%;transform:translateX(-50%);width:168px;height:9px;}
-#prog-groove{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
-#prog-bar{position:absolute;inset:0;width:0%;overflow:hidden;pointer-events:none;}
-#prog-bar-img{width:168px;height:9px;max-width:none;display:block;object-fit:fill;}
-#g-pct{position:absolute;top:32px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:900;text-shadow:1px 1px 0 #000;}
+/* Custom Progress Bar and Percent */
+#prog-wrap{position:absolute;top:15px;left:50%;transform:translateX(-50%);width:280px;height:12px;background:rgba(0,0,0,0.4);border:2px solid #fff;border-radius:10px;overflow:hidden;box-shadow:0 0 4px #000;}
+#prog-fill{width:0%;height:100%;background:#00FF00;}
+#g-pct{position:absolute;top:34px;left:50%;transform:translateX(-50%);font-size:15px;font-weight:900;color:#fff;text-shadow:2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;letter-spacing:1px;}
 
 #win-screen{position:absolute;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;cursor:pointer;}
 #win-screen h2{font-size:54px;color:#FFD700;text-shadow:4px 4px 0 #8B4513;}
@@ -239,10 +238,7 @@ body{background:#000;font-family:'Pusab',Arial,sans-serif;color:#fff;overflow:hi
   <div id="game-ui">
     <div id="g-title">Level</div>
     <div id="prog-wrap">
-      <img id="prog-groove" src="https://media.discordapp.net/attachments/1324119314701488263/1489987993757552831/slidergroove_02.png?ex=69d26af4&is=69d11974&hm=6963d00d0833234afab6ca29badab315f91cae7f70509ec8bc004b1505775743&=&format=webp&quality=lossless&width=168&height=9">
-      <div id="prog-bar" style="width:0%">
-        <img id="prog-bar-img" src="https://cdn.discordapp.com/attachments/1324119314701488263/1489987994386436276/sliderBar2.png?ex=69d26af4&is=69d11974&hm=1b6a0edbefb74b52c7d805cfdce203a212d438ec9443e508e7ada27d01ff8296&">
-      </div>
+      <div id="prog-fill"></div>
     </div>
     <div id="g-pct">0%</div>
   </div>
@@ -256,7 +252,7 @@ const TILE=64, GROUND_Y=9*TILE;
 const CEIL_Y = -3*TILE; 
 const SHIP_TUNNEL_H = GROUND_Y - CEIL_Y; 
 const GROUND_TS=250;
-const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1270;
+const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1250;
 const SHIP_GRAV=2800, SHIP_THRUST=-3500, SHIP_MAXVY=1080;
 const BG_PAR=0.12;
 const BG_TS=1400;
@@ -620,7 +616,7 @@ function editLevel(i){
 function openEditor(){
   hide('menu');hide('levels-screen');show('editor','flex');hide('game');
   stopGame(); 
-  camX=200;camY=GROUND_Y-320;camZoom=1;
+  camX=200;camY=GROUND_Y-200;camZoom=1;
   selObjs=[];lmbDown=false;lmbDrag=false;lmbOnCanvas=false;isRmbDown=false;isMmbDown=false;objDrag=false;
   selScale=1;szBase=null;
   undoStack=[]; redoStack=[]; 
@@ -1191,7 +1187,7 @@ function drawEd(){
         edCtx.lineWidth=2;
         const sHW_visual = (sw/2) * 0.25;  
         const sHH_visual = (sh/2) * 0.35; 
-        const spikeCenterY_visual = (sh/2) - sHH_visual;
+        const spikeCenterY_visual = (sh/2) - sHH_visual - (sh * 0.25);
         edCtx.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2);
       }
       else if(t.kind==='saw'){
@@ -1312,7 +1308,7 @@ function resetPl(){
   tunnelCeil = CEIL_Y;
   
   gCamX = player.x - logicalW * 0.3;
-  gCamY = tunnelFloor - logicalH * 0.25; 
+  gCamY = tunnelFloor - logicalH * 0.35; 
   shipTransAnim=0; shipTransDir=1; prevGMode='cube';
   orbSt.forEach(o=>{ o.used=false; }); 
   orbAnims=[]; padEffects=[];
@@ -1464,10 +1460,10 @@ function updateG(dt){
       targetCamY = (tunnelFloor + tunnelCeil) / 2;
   } else {
       if (gravityDir === 1) {
-          const maxCam = tunnelFloor - logicalH * 0.25;
+          const maxCam = tunnelFloor - logicalH * 0.35;
           if (targetCamY > maxCam) targetCamY = maxCam;
       } else {
-          const minCam = tunnelCeil + logicalH * 0.25;
+          const minCam = tunnelCeil + logicalH * 0.35;
           if (targetCamY < minCam) targetCamY = minCam;
       }
   }
@@ -1538,9 +1534,6 @@ function updateG(dt){
             player.vy = 0; player.onGround = true; player.onSlope = onSlopeThisFrame;
         }
     } else {
-        if (pEdge <= tunnelCeil && pPrevEdge >= tunnelCeil - 1) {
-            if (tunnelCeil > landingY) { landingY = tunnelCeil; onSlopeThisFrame = false; }
-        }
         if (landingY !== -Infinity) {
             player.y = landingY + pLandHH;
             player.vy = 0; player.onGround = true; player.onSlope = onSlopeThisFrame;
@@ -1714,7 +1707,7 @@ function updateG(dt){
       const cos = Math.cos(rad), sin = Math.sin(rad);
       const pxLocal = (player.x - ox) * cos - (player.y - oy) * sin;
       const pyLocal = (player.x - ox) * sin + (player.y - oy) * cos;
-      const sHW_obj = hw * 0.25, sHH_obj = hh * 0.35, spikeCenterYOffset = hh - sHH_obj;
+      const sHW_obj = hw * 0.25, sHH_obj = hh * 0.35, spikeCenterYOffset = hh - sHH_obj - (hh * 2 * 0.25);
       if(Math.abs(pxLocal) <= sHW_obj + pRedHW && Math.abs(pyLocal - spikeCenterYOffset) <= sHH_obj + pRedHH){ die(); return; }
     } else if(t.kind==='saw'){
         let dist = Math.hypot(player.x - ox, player.y - oy);
@@ -1762,7 +1755,7 @@ function updateG(dt){
   player.wasOnSlope = player.onSlope;
   if(player.x>=lvEnd){ won=true;show('win-screen','flex');$('win-screen').onclick=exitGame; }
   const pct=Math.min(100,Math.max(0,(player.x/lvEnd)*100));
-  $('prog-bar').style.width=pct+'%'; $('g-pct').textContent=Math.floor(pct)+'%';
+  $('prog-fill').style.width=pct+'%'; $('g-pct').textContent=Math.floor(pct)+'%';
 }
 
 function die(){
@@ -1991,7 +1984,7 @@ function drawG(){
       else if(t.kind==='spike'){ 
         gCtx2.strokeStyle='rgba(255,80,80,.9)'; gCtx2.lineWidth=2; 
         const sHW_visual=(sw/2)*0.25, sHH_visual=(sh/2)*0.35;
-        const spikeCenterY_visual = (sh/2) - sHH_visual;
+        const spikeCenterY_visual = (sh/2) - sHH_visual - (sh * 0.25);
         gCtx2.strokeRect(-sHW_visual, spikeCenterY_visual - sHH_visual, sHW_visual*2, sHH_visual*2); 
       }
       else if(t.kind==='saw'){
