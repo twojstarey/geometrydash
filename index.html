@@ -1,4 +1,3 @@
---- START OF FILE ai_studio_code (60).html ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1323,15 +1322,15 @@ function resetPl(){
   gravityDir = 1;
   isMini = false;
   player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false,onDBlock:false};
-  gZoom = gC ? gC.height / 850 : 1; 
+  gZoom = gC ? gC.height / 720 : 1; 
   const logicalW = gC ? gC.width / gZoom : innerWidth;
-  const logicalH = gC ? gC.height / gZoom : 850;
+  const logicalH = gC ? gC.height / gZoom : 720;
   
   tunnelFloor = GROUND_Y;
   tunnelCeil = CEIL_Y;
   
   gCamX = player.x - logicalW * 0.3;
-  gCamY = tunnelFloor - logicalH * 0.35; 
+  gCamY = tunnelFloor - logicalH * 0.25; // Adjusted down for better view
   shipTransAnim=0; shipTransDir=1; prevGMode='cube';
   orbSt.forEach(o=>{ o.used=false; }); 
   orbAnims=[]; padEffects=[];
@@ -1417,7 +1416,7 @@ function updateDeath(dt) {
 }
 
 function updateG(dt){
-  gZoom = gC.height / 850; 
+  gZoom = gC.height / 720; 
   const logicalW = gC.width / gZoom;
   const logicalH = gC.height / gZoom;
 
@@ -1479,15 +1478,15 @@ function updateG(dt){
   if(shipTransAnim > 0) shipTransAnim = Math.max(0, shipTransAnim - dt);
 
   // Smooth Camera Follow
-  let targetCamY = player.y;
+  let targetCamY = player.y + (logicalH * 0.1 * gravityDir); // Add offset to shift camera lower naturally
   if (isTunnel) {
       targetCamY = (tunnelFloor + tunnelCeil) / 2;
   } else {
       if (gravityDir === 1) { // Normal gravity
-          const maxCam = tunnelFloor - logicalH * 0.35;
+          const maxCam = tunnelFloor - logicalH * 0.25; // Adjusted down for better view
           if (targetCamY > maxCam) targetCamY = maxCam;
       } else { // Reverse gravity
-          const minCam = tunnelCeil + logicalH * 0.35;
+          const minCam = tunnelCeil + logicalH * 0.25; // Adjusted down for better view
           if (targetCamY < minCam) targetCamY = minCam;
       }
   }
@@ -1840,19 +1839,77 @@ function die(){
   }
 
   deathParticles =[]; deathWave = 0;
-  for(let i=0; i<4; i++){
-      for(let j=0; j<4; j++){
-          deathParticles.push({
-              x: player.x - TILE/2 + (i*TILE/4) + TILE/8,
-              y: player.y - TILE/2 + (j*TILE/4) + TILE/8,
-              vx: (Math.random() - 0.5) * 600,
-              vy: (Math.random() - 1.2) * 800,
-              rot: Math.random() * 360,
-              rotV: (Math.random() - 0.5) * 800,
-              size: TILE/4 * (0.6 + Math.random()*0.5)
-          });
+
+  // Render the player's exact current visual state into an offscreen canvas
+  const oc = document.createElement('canvas');
+  oc.width = 128; oc.height = 128;
+  const ox = oc.getContext('2d');
+  
+  ox.translate(64, 64);
+  ox.rotate(player.rot * Math.PI / 180);
+  if (gravityDir === -1) ox.scale(1, -1);
+  let pScale = isMini ? 0.5 : 1;
+  ox.scale(pScale, pScale);
+  
+  if(gMode==='ship'){
+    const ci=IM.cube, si=IM.ship;
+    if(ok(si)) ox.drawImage(si, -TILE*0.8, -TILE*0.4, TILE*1.6, TILE*0.8);
+    else {ox.fillStyle='rgba(255,140,0,.85)';ox.fillRect(-TILE*0.8,-TILE*0.4,TILE*1.6,TILE*0.8);}
+    if(ok(ci)) ox.drawImage(ci, -TILE*0.3, -TILE*0.56, TILE*0.45, TILE*0.45);
+    else {ox.fillStyle='#7DF';ox.fillRect(-TILE*0.3,-TILE*0.56,TILE*0.45,TILE*0.45);}
+  } else if (gMode==='wave'){
+    const wi=IM.wave;
+    if(ok(wi)) ox.drawImage(wi, -TILE*0.5, -TILE*0.45, TILE*1.0, TILE*0.9);
+    else {ox.fillStyle='#7DF';ox.fillRect(-TILE*0.4,-TILE*0.4,TILE*0.8,TILE*0.8);}
+  } else {
+    const ci=IM.cube; if(ok(ci)) ox.drawImage(ci,-TILE/2,-TILE/2,TILE,TILE);
+    else{ox.fillStyle='#7DF';ox.fillRect(-TILE/2,-TILE/2,TILE,TILE);}
+  }
+  
+  window.deathCanvas = oc;
+  
+  // Slice the offscreen canvas into fragments
+  const imgData = ox.getImageData(0, 0, 128, 128).data;
+  const gridSize = 8;
+  const pSize = 128 / gridSize;
+  
+  for(let i=0; i<gridSize; i++){
+      for(let j=0; j<gridSize; j++){
+          const sx = i * pSize;
+          const sy = j * pSize;
+          
+          let hasPixels = false;
+          // Check if this slice has any visible pixels
+          for(let px = Math.floor(sx); px < Math.floor(sx + pSize); px += 2){
+              for(let py = Math.floor(sy); py < Math.floor(sy + pSize); py += 2){
+                  const alpha = imgData[(py * 128 + px) * 4 + 3];
+                  if(alpha > 10){
+                      hasPixels = true;
+                      break;
+                  }
+              }
+              if(hasPixels) break;
+          }
+          
+          if(hasPixels) {
+              const offsetX = sx + pSize/2 - 64;
+              const offsetY = sy + pSize/2 - 64;
+              
+              deathParticles.push({
+                  x: player.x + offsetX,
+                  y: player.y + offsetY,
+                  vx: (Math.random() - 0.5) * 800 + (PLAYER_SPD * 0.3),
+                  vy: (Math.random() - 1.2) * 800,
+                  rot: 0,
+                  rotV: (Math.random() - 0.5) * 800,
+                  size: pSize,
+                  sx: sx,
+                  sy: sy
+              });
+          }
       }
   }
+
   respawnTimer = 1.0;
 }
 
@@ -1892,13 +1949,12 @@ function drawG(){
     gCtx2.fillRect(0, baseFloorY, logicalW, GROUND_TS);
   }
 
+  // Pre-calculate gradient for later drawing the outer layer lines over everything
   let gGrad = gCtx2.createLinearGradient(0, 0, logicalW, 0);
   gGrad.addColorStop(0, 'rgba(255,255,255,0)');
   gGrad.addColorStop(0.05, 'rgba(255,255,255,1)');
   gGrad.addColorStop(0.95, 'rgba(255,255,255,1)');
   gGrad.addColorStop(1, 'rgba(255,255,255,0)');
-  gCtx2.fillStyle = gGrad;
-  gCtx2.fillRect(0, baseFloorY - 2, logicalW, 4);
 
   if(gMode==='ship' || gMode==='wave' || shipTransAnim > 0){
     let startCeilY = sY(tunnelCeil) - logicalH;
@@ -1922,9 +1978,6 @@ function drawG(){
       gCtx2.restore();
       gCtx2.globalCompositeOperation = 'source-over';
     }
-
-    gCtx2.fillStyle = gGrad;
-    gCtx2.fillRect(0, animCeilY - 2, logicalW, 4);
     
     if (tunnelFloor < GROUND_Y) {
         let startTFloorY = sY(tunnelFloor) + logicalH;
@@ -1942,9 +1995,6 @@ function drawG(){
             gCtx2.drawImage(IM.ground, tx, animTFloorY, GROUND_TS, GROUND_TS);
           gCtx2.globalCompositeOperation = 'source-over';
         }
-
-        gCtx2.fillStyle = gGrad;
-        gCtx2.fillRect(0, animTFloorY - 2, logicalW, 4);
     }
   }
 
@@ -2174,10 +2224,27 @@ function drawG(){
       gCtx2.lineWidth = 5; gCtx2.stroke();
       deathParticles.forEach(p => {
           gCtx2.save(); gCtx2.translate(sX(p.x), sY(p.y)); gCtx2.rotate(p.rot * Math.PI/180); 
-          gCtx2.fillStyle = '#00f6ff'; gCtx2.fillRect(-p.size/2, -p.size/2, p.size, p.size);
-          gCtx2.strokeStyle = '#000'; gCtx2.lineWidth = 2; gCtx2.strokeRect(-p.size/2, -p.size/2, p.size, p.size);
+          if(window.deathCanvas) {
+              gCtx2.drawImage(window.deathCanvas, p.sx, p.sy, p.size, p.size, -p.size/2, -p.size/2, p.size, p.size);
+          }
           gCtx2.restore();
       });
+  }
+
+  // --- DRAW GROUND LINES AS OUTER LAYER (OVER PLAYER AND OBJECTS) ---
+  gCtx2.fillStyle = gGrad;
+  gCtx2.fillRect(0, baseFloorY - 2, logicalW, 4);
+
+  if(gMode==='ship' || gMode==='wave' || shipTransAnim > 0){
+    let startCeilY = sY(tunnelCeil) - logicalH;
+    let animCeilY = startCeilY + (sY(tunnelCeil) - startCeilY) * eased;
+    gCtx2.fillRect(0, animCeilY - 2, logicalW, 4);
+    
+    if (tunnelFloor < GROUND_Y) {
+        let startTFloorY = sY(tunnelFloor) + logicalH;
+        let animTFloorY = startTFloorY + (sY(tunnelFloor) - startTFloorY) * eased;
+        gCtx2.fillRect(0, animTFloorY - 2, logicalW, 4);
+    }
   }
   
   gCtx2.restore(); 
@@ -2196,4 +2263,3 @@ window.addEventListener('load', () => {
 </script>
 </body>
 </html>
---- END OF FILE ai_studio_code (60).html ---
