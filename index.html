@@ -1279,7 +1279,7 @@ let gC,gCtx2,gRun=false,gAF=null,curLv,fromEd;
 let player={},gMode='cube',gCamX=0, gCamY=0; 
 let lvEnd=0,dead=false,won=false;
 let jHeld=false,jPrev=false,jumpBuf=0;
-let hbx2=false,orbSt=[],lastT=0;
+let hbx2=false,lastT=0;
 let orbAnims=[]; 
 let padEffects=[];
 let deathParticles=[], deathWave=0, respawnTimer=0, gAttemptTextTimer=0;
@@ -1314,6 +1314,7 @@ function startGame(lv,fe){
       o.offsetX = 0;
       o.offsetY = 0;
       o.renderOpac = 1;
+      o.orbUsed = false; 
   });
   window.activeMoves =[];
   window.activeAlphas =[];
@@ -1325,7 +1326,6 @@ function startGame(lv,fe){
   let baseGrCol = hexToRgb(groundColor);
   gGrCol =[...baseGrCol]; gGrTarget =[...baseGrCol]; gGrFadeT = 0; gGrFadeDur = 0;
 
-  orbSt=lv.objs.filter(o=>td(o.typeId).kind==='orb').map(o=>({...o,used:false}));
   resetPl(); 
   
   if (currentMusic !== 'none' && audioPlayer.src) { 
@@ -1359,7 +1359,6 @@ function resetPl(){
   gCamX = player.x - logicalW * 0.3;
   gCamY = tunnelFloor - logicalH * 0.25; 
   shipTransAnim=0; shipTransDir=1; prevGMode='cube';
-  orbSt.forEach(o=>{ o.used=false; }); 
   orbAnims=[]; padEffects=[];
   pWaveTrail =[]; 
   playerParticles =[];
@@ -1368,9 +1367,9 @@ function resetPl(){
 
 function gRes(){if(gC){gC.width=innerWidth;gC.height=innerHeight;}}
 function stopGame(){gRun=false;if(gAF){cancelAnimationFrame(gAF);gAF=null;}}
-function gKD(e){if(!gRun)return;if(e.code==='Space'||e.code==='ArrowUp'){if(!jHeld)jumpBuf=0.15; jHeld=true;}if(e.key==='m'||e.key==='M')hbx2=!hbx2;}
+function gKD(e){if(!gRun)return;if(e.code==='Space'||e.code==='ArrowUp'){if(!jHeld)jumpBuf=0.18; jHeld=true;}if(e.key==='m'||e.key==='M')hbx2=!hbx2;}
 function gKU(e){if(e.code==='Space'||e.code==='ArrowUp')jHeld=false;}
-function gClick(e){if(!gRun)return;if(won){exitGame();return;}if(dead)return; initAudio(); if(!jHeld)jumpBuf=0.15; jHeld=true;}
+function gClick(e){if(!gRun)return;if(won){exitGame();return;}if(dead)return; initAudio(); if(!jHeld)jumpBuf=0.18; jHeld=true;}
 function gMUp(){jHeld=false;}
 function exitGame(){
   stopGame();jHeld=false;
@@ -1404,6 +1403,7 @@ function respawn(){
       o.offsetX = 0;
       o.offsetY = 0;
       o.renderOpac = 1;
+      o.orbUsed = false;
   });
   lastT=performance.now();gRun=true;gAF=requestAnimationFrame(gLoop);
   
@@ -1900,14 +1900,13 @@ function updateG(dt){
           padEffects.push({x: ox, y: oy, t: 0});
       }
     } else if(t.kind==='orb'){
-      const os=orbSt.find(s=>s.x===obj.x&&s.y===obj.y);
-      if(os && !os.used && jumpBuf > 0 && dx < hw + pLandHH && dy < hh + pLandHH){
+      if(!obj.orbUsed && jumpBuf > 0 && dx < hw + TILE*0.7 && dy < hh + TILE*0.7){
         if (obj.typeId === 'orb') {
             player.vy = (isMini ? -975 : JUMP_V) * gravityDir; 
         } else if (obj.typeId === 'pink_orb') {
             player.vy = (isMini ? -819 : -1050) * gravityDir; 
         }
-        player.onGround=false; os.used=true;
+        player.onGround=false; obj.orbUsed=true;
         
         if (gMode === 'ufo') {
             player.rot = 18 * gravityDir; // Hop rotation for orbs too
