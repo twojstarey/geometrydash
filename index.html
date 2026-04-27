@@ -303,8 +303,7 @@ const SRC={
   ground_trigger:'https://i.imgur.com/55QWy7m.png',
   alpha_trigger:'https://i.imgur.com/sa2bFKP.png',
   move_trigger:'https://i.imgur.com/MpXaj91.png',
-  saw:'https://i.imgur.com/eRhUsPU.png',
-  dblock:'https://i.imgur.com/tUUPpZ1.png'
+  saw:'https://i.imgur.com/eRhUsPU.png'
 };
 const IM={};
 for(const[k,v]of Object.entries(SRC)){const i=new Image();i.crossOrigin='anonymous';i.src=v;IM[k]=i;}
@@ -356,7 +355,6 @@ const TYPES=[
   {id:'ground_trigger',lbl:'GND\nTrigger',img:'ground_trigger',w:0.8,h:1,kind:'trigger',solid:false},
   {id:'alpha_trigger',lbl:'Alpha\nTrigger',img:'alpha_trigger',w:1.2,h:1,kind:'trigger',solid:false},
   {id:'move_trigger',lbl:'Move\nTrigger',img:'move_trigger',w:1,h:1,kind:'trigger',solid:false},
-  {id:'dblock',      lbl:'D Block',     img:'dblock',      w:1,  h:1,  kind:'dblock', solid:false},
 ];
 function td(id){return TYPES.find(t=>t.id===id)||TYPES[0];}
 
@@ -1190,19 +1188,6 @@ function drawEd(){
       if (t.isDeco && o.color) {
         const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
         edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
-      } else if (t.kind === 'dblock') {
-        // D blocks: semi-transparent in editor to indicate invisible in game
-        edCtx.globalAlpha = 0.55;
-        edCtx.drawImage(img, -sw/2, -sh/2, sw, sh);
-        edCtx.globalAlpha = 1;
-        // Dashed magenta border to indicate D block
-        edCtx.save();
-        edCtx.setLineDash([6, 4]);
-        edCtx.strokeStyle = '#FF00FF';
-        edCtx.lineWidth = 2;
-        edCtx.strokeRect(-sw/2, -sh/2, sw, sh);
-        edCtx.setLineDash([]);
-        edCtx.restore();
       } else {
         edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
       }
@@ -1279,7 +1264,7 @@ let gC,gCtx2,gRun=false,gAF=null,curLv,fromEd;
 let player={},gMode='cube',gCamX=0, gCamY=0; 
 let lvEnd=0,dead=false,won=false;
 let jHeld=false,jPrev=false,jumpBuf=0;
-let hbx2=false,lastT=0;
+let hbx2=false,orbSt=[],lastT=0;
 let orbAnims=[]; 
 let padEffects=[];
 let deathParticles=[], deathWave=0, respawnTimer=0, gAttemptTextTimer=0;
@@ -1314,7 +1299,7 @@ function startGame(lv,fe){
       o.offsetX = 0;
       o.offsetY = 0;
       o.renderOpac = 1;
-      o.orbUsed = false; 
+      o.orbUsed = false;
   });
   window.activeMoves =[];
   window.activeAlphas =[];
@@ -1326,6 +1311,7 @@ function startGame(lv,fe){
   let baseGrCol = hexToRgb(groundColor);
   gGrCol =[...baseGrCol]; gGrTarget =[...baseGrCol]; gGrFadeT = 0; gGrFadeDur = 0;
 
+  orbSt=lv.objs.filter(o=>td(o.typeId).kind==='orb').map(o=>({...o,used:false}));
   resetPl(); 
   
   if (currentMusic !== 'none' && audioPlayer.src) { 
@@ -1348,7 +1334,7 @@ function startGame(lv,fe){
 function resetPl(){
   gravityDir = 1;
   isMini = false;
-  player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false,onDBlock:false};
+  player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false};
   gZoom = gC ? gC.height / 820 : 1; 
   const logicalW = gC ? gC.width / gZoom : innerWidth;
   const logicalH = gC ? gC.height / gZoom : 820;
@@ -1359,6 +1345,7 @@ function resetPl(){
   gCamX = player.x - logicalW * 0.3;
   gCamY = tunnelFloor - logicalH * 0.25; 
   shipTransAnim=0; shipTransDir=1; prevGMode='cube';
+  orbSt.forEach(o=>{ o.used=false; }); 
   orbAnims=[]; padEffects=[];
   pWaveTrail =[]; 
   playerParticles =[];
@@ -1712,7 +1699,7 @@ function updateG(dt){
 
     let waveAngle = isMini ? 63 : 45;
     let targetRot = (jHeld ? -waveAngle : waveAngle) * gravityDir;
-    if (isFloor || isCeil || player.onDBlock) targetRot = 0;
+    if (isFloor || isCeil) targetRot = 0;
 
     const rotSpeed = isMini ? 1200 : 900; 
     if (player.rot < targetRot) {
@@ -1728,11 +1715,9 @@ function updateG(dt){
   while(pWaveTrail.length > 0 && pWaveTrail[0].x < gCamX - TILE*2) pWaveTrail.shift();
 
   // --- Collision and Interaction Loop ---
-  player.onDBlock = false; 
   for(const obj of curLv.objs){
     const t=td(obj.typeId),sc=obj.scale||1;
     if (t.isDeco) continue; 
-    if (t.kind === 'dblock') continue; 
     
     const ox = obj.x + (obj.offsetX || 0);
     const oy = obj.y + (obj.offsetY || 0);
@@ -1846,31 +1831,7 @@ function updateG(dt){
     } else if(t.kind==='block'&&t.solid) {
         if (gMode === 'wave') {
             if (dx < hw + TILE*0.14*pScale && dy < hh + TILE*0.14*pScale) {
-                // Check if there's a D block placed at this block's position
-                const hasDBlock = curLv.objs.some(dobj =>
-                    td(dobj.typeId).kind === 'dblock' &&
-                    Math.abs(dobj.x - obj.x) < TILE * 0.5 &&
-                    Math.abs(dobj.y - obj.y) < TILE * 0.5
-                );
-                if (hasDBlock) {
-                    // Determine if this is a side collision (die) or top/bottom (safe)
-                    const overlapX = (hw + TILE*0.14*pScale) - dx;
-                    const overlapY = (hh + TILE*0.14*pScale) - dy;
-                    if (overlapX < overlapY) {
-                        // Side (wall) collision → die
-                        die(); return;
-                    }
-                    // Top or bottom collision → push player out, don't die
-                    const waveRadius = TILE * 0.4 * pScale;
-                    if (player.y < oy) {
-                        player.y = oy - hh - waveRadius;
-                    } else {
-                        player.y = oy + hh + waveRadius;
-                    }
-                    player.onDBlock = true; // flatten wave rotation to 0°
-                } else {
-                    die(); return;
-                }
+                die(); return;
             }
         } else {
             if (dx < hw + pBlueHW && dy < hh + pBlueHH) { die(); return; }
@@ -1909,7 +1870,7 @@ function updateG(dt){
         player.onGround=false; obj.orbUsed=true;
         
         if (gMode === 'ufo') {
-            player.rot = 18 * gravityDir; // Hop rotation for orbs too
+            player.rot = 18 * gravityDir; 
         }
         
         jumpBuf = 0;
