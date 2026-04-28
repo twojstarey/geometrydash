@@ -354,7 +354,7 @@ const TYPES=[
   {id:'bg_trigger',lbl:'BG\nTrigger',img:'bg_trigger',w:0.8, h:1,   kind:'trigger',solid:false},
   {id:'ground_trigger',lbl:'GND\nTrigger',img:'ground_trigger',w:0.8,h:1,kind:'trigger',solid:false},
   {id:'alpha_trigger',lbl:'Alpha\nTrigger',img:'alpha_trigger',w:1.2,h:1,kind:'trigger',solid:false},
-  {id:'move_trigger',lbl:'Move\nTrigger',img:'move_trigger',w:1,h:1,kind:'trigger',solid:false},
+  {id:'move_trigger',lbl:'Move\nTrigger',img:'move_trigger',w:1,h:1,kind:'trigger',solid:false}
 ];
 function td(id){return TYPES.find(t=>t.id===id)||TYPES[0];}
 
@@ -1264,7 +1264,7 @@ let gC,gCtx2,gRun=false,gAF=null,curLv,fromEd;
 let player={},gMode='cube',gCamX=0, gCamY=0; 
 let lvEnd=0,dead=false,won=false;
 let jHeld=false,jPrev=false,jumpBuf=0;
-let hbx2=false,orbSt=[],lastT=0;
+let hbx2=false,lastT=0;
 let orbAnims=[]; 
 let padEffects=[];
 let deathParticles=[], deathWave=0, respawnTimer=0, gAttemptTextTimer=0;
@@ -1299,7 +1299,7 @@ function startGame(lv,fe){
       o.offsetX = 0;
       o.offsetY = 0;
       o.renderOpac = 1;
-      o.orbUsed = false;
+      o.orbUsed = false; 
   });
   window.activeMoves =[];
   window.activeAlphas =[];
@@ -1311,7 +1311,6 @@ function startGame(lv,fe){
   let baseGrCol = hexToRgb(groundColor);
   gGrCol =[...baseGrCol]; gGrTarget =[...baseGrCol]; gGrFadeT = 0; gGrFadeDur = 0;
 
-  orbSt=lv.objs.filter(o=>td(o.typeId).kind==='orb').map(o=>({...o,used:false}));
   resetPl(); 
   
   if (currentMusic !== 'none' && audioPlayer.src) { 
@@ -1345,7 +1344,6 @@ function resetPl(){
   gCamX = player.x - logicalW * 0.3;
   gCamY = tunnelFloor - logicalH * 0.25; 
   shipTransAnim=0; shipTransDir=1; prevGMode='cube';
-  orbSt.forEach(o=>{ o.used=false; }); 
   orbAnims=[]; padEffects=[];
   pWaveTrail =[]; 
   playerParticles =[];
@@ -1977,11 +1975,11 @@ function die(){
   if(gMode==='ship'){
     const ci=IM.cube, si=IM.ship;
     // Inner Layer (Cube)
-    if(ok(ci)) ox.drawImage(ci, -TILE*0.35, -TILE*0.65, TILE*0.6, TILE*0.6);
-    else {ox.fillStyle='#7DF';ox.fillRect(-TILE*0.35,-TILE*0.65,TILE*0.6,TILE*0.6);}
+    if(ok(ci)) ox.drawImage(ci, -TILE*0.25, -TILE*0.55, TILE*0.5, TILE*0.5);
+    else {ox.fillStyle='#7DF';ox.fillRect(-TILE*0.25,-TILE*0.55,TILE*0.5,TILE*0.5);}
     // Outer Layer (Ship Shell)
-    if(ok(si)) ox.drawImage(si, -TILE*0.8, -TILE*0.4, TILE*1.6, TILE*0.8);
-    else {ox.fillStyle='rgba(255,140,0,.85)';ox.fillRect(-TILE*0.8,-TILE*0.4,TILE*1.6,TILE*0.8);}
+    if(ok(si)) ox.drawImage(si, -TILE*0.7, -TILE*0.35, TILE*1.4, TILE*0.7);
+    else {ox.fillStyle='rgba(255,140,0,.85)';ox.fillRect(-TILE*0.7,-TILE*0.35,TILE*1.4,TILE*0.7);}
   } else if (gMode==='ufo'){
     const ci=IM.cube, ui=IM.ufo;
     if(ok(ci)) ox.drawImage(ci, -TILE*0.25, -TILE*0.35, TILE*0.5, TILE*0.5);
@@ -2332,11 +2330,11 @@ function drawG(){
       if(gMode==='ship'){
         const ci=IM.cube, si=IM.ship;
         // Inner Layer (Cube)
-        if(ok(ci)) gCtx2.drawImage(ci, -TILE*0.35, -TILE*0.65, TILE*0.6, TILE*0.6);
-        else {gCtx2.fillStyle='#7DF';gCtx2.fillRect(-TILE*0.35,-TILE*0.65,TILE*0.6,TILE*0.6);}
+        if(ok(ci)) gCtx2.drawImage(ci, -TILE*0.25, -TILE*0.55, TILE*0.5, TILE*0.5);
+        else {gCtx2.fillStyle='#7DF';gCtx2.fillRect(-TILE*0.25,-TILE*0.55,TILE*0.5,TILE*0.5);}
         // Outer Layer (Ship Shell)
-        if(ok(si)) gCtx2.drawImage(si, -TILE*0.8, -TILE*0.4, TILE*1.6, TILE*0.8);
-        else {gCtx2.fillStyle='rgba(255,140,0,.85)';gCtx2.fillRect(-TILE*0.8,-TILE*0.4,TILE*1.6,TILE*0.8);}
+        if(ok(si)) gCtx2.drawImage(si, -TILE*0.7, -TILE*0.35, TILE*1.4, TILE*0.7);
+        else {gCtx2.fillStyle='rgba(255,140,0,.85)';gCtx2.fillRect(-TILE*0.7,-TILE*0.35,TILE*1.4,TILE*0.7);}
       } else if (gMode==='ufo'){
         const ci=IM.cube, ui=IM.ufo;
         // Inner Layer (Cube)
