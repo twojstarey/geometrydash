@@ -1190,11 +1190,36 @@ function drawEd(){
     const img=IM[t.img];
     
     if(ok(img)) {
-      if (t.isDeco && o.color) {
-        const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
-        edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
+      let isOrb = (t.kind === 'orb');
+      let drawGlow = false;
+      let glowAlpha = 1.0;
+      let opac = o.renderOpac !== undefined ? o.renderOpac : 1;
+
+      if (isOrb) {
+          let currentPulse = musicPulse;
+          let drawSw = sw * currentPulse;
+          let drawSh = sh * currentPulse;
+          
+          if(o.typeId === 'pink_orb') edCtx.shadowColor = '#FF55FF';
+          else if(o.typeId === 'blue_orb') edCtx.shadowColor = '#00AAFF';
+          else edCtx.shadowColor = '#FFD700';
+          
+          edCtx.shadowBlur = 30 * glowAlpha * opac;
+
+          if (t.isDeco && o.color) {
+            const tinted = getTinted(img, o.color, Math.ceil(drawSw), Math.ceil(drawSh));
+            edCtx.drawImage(tinted, -drawSw/2, -drawSh/2, drawSw, drawSh);
+          } else {
+            edCtx.drawImage(img,-drawSw/2,-drawSh/2,drawSw,drawSh);
+          }
+          edCtx.shadowBlur = 0;
       } else {
-        edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
+          if (t.isDeco && o.color) {
+            const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
+            edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
+          } else {
+            edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
+          }
       }
       
       if (t.id === 'alpha_trigger' || t.id === 'move_trigger') {
@@ -1269,7 +1294,7 @@ let gC,gCtx2,gRun=false,gAF=null,curLv,fromEd;
 let player={},gMode='cube',gCamX=0, gCamY=0; 
 let lvEnd=0,dead=false,won=false;
 let jHeld=false,jPrev=false,jumpBuf=0;
-let hbx2=false,lastT=0;
+let hbx2=false,orbSt=[],lastT=0;
 let orbAnims=[]; 
 let padEffects=[];
 let deathParticles=[], deathWave=0, respawnTimer=0, gAttemptTextTimer=0;
@@ -1317,6 +1342,7 @@ function startGame(lv,fe){
   let baseGrCol = hexToRgb(groundColor);
   gGrCol =[...baseGrCol]; gGrTarget =[...baseGrCol]; gGrFadeT = 0; gGrFadeDur = 0;
 
+  orbSt=lv.objs.filter(o=>td(o.typeId).kind==='orb').map(o=>({...o,used:false}));
   resetPl(); 
   
   if (currentMusic !== 'none' && audioPlayer.src) { 
@@ -1339,7 +1365,7 @@ function startGame(lv,fe){
 function resetPl(){
   gravityDir = 1;
   isMini = false;
-  player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false};
+  player={x:TILE*3,y:GROUND_Y-TILE*0.5,vy:0,rot:0,rotV:0,onGround:false,slopeTargetRot:0,onSlope:false,wasOnSlope:false};
   gZoom = gC ? gC.height / 820 : 1; 
   const logicalW = gC ? gC.width / gZoom : innerWidth;
   const logicalH = gC ? gC.height / gZoom : 820;
@@ -1758,7 +1784,7 @@ function updateG(dt){
             player.y = landingY - pLandHH;
             player.vy = 0; player.onGround = true;
         }
-        let ballRadius = TILE * 0.45 * pScale;
+        let ballRadius = TILE * 0.5 * pScale;
         if (player.y - ballRadius <= tunnelCeil) {
             player.y = tunnelCeil + ballRadius;
             if (player.vy < 0) player.vy = 0;
@@ -1771,14 +1797,17 @@ function updateG(dt){
             player.y = landingY + pLandHH;
             player.vy = 0; player.onGround = true;
         }
-        let ballRadius = TILE * 0.45 * pScale;
+        let ballRadius = TILE * 0.5 * pScale;
         if (player.y + ballRadius >= tunnelFloor) {
             player.y = tunnelFloor - ballRadius;
             if (player.vy > 0) player.vy = 0;
         }
     }
 
-    player.rot += 1260 * dt * gravityDir;
+    player.rotV = player.rotV || 0;
+    let targetRotV = 540 * gravityDir; 
+    player.rotV += (targetRotV - player.rotV) * 15 * dt;
+    player.rot += player.rotV * dt;
 
     if (jHeld && jumpBuf > 0 && player.onGround) {
         gravityDir *= -1;
@@ -1948,7 +1977,7 @@ function updateG(dt){
     } else if(t.kind==='orb'){
       if(!obj.orbUsed && jumpBuf > 0 && dx < hw + TILE*0.7 && dy < hh + TILE*0.7){
         if (obj.typeId === 'orb') {
-            player.vy = (isMini ? -975 : -1250) * gravityDir; 
+            player.vy = (isMini ? -975 : JUMP_V) * gravityDir; 
         } else if (obj.typeId === 'pink_orb') {
             player.vy = (isMini ? -819 : -1180) * gravityDir; 
         } else if (obj.typeId === 'blue_orb') {
@@ -2034,6 +2063,7 @@ function updateG(dt){
       return p.life > 0;
   });
 
+  player.wasOnSlope = player.onSlope;
   if(player.x>=lvEnd){ won=true;show('win-screen','flex');$('win-screen').onclick=exitGame; }
   const pct=Math.min(100,Math.max(0,(player.x/lvEnd)*100));
   $('prog-fill').style.width=pct+'%'; $('g-pct').textContent=Math.floor(pct)+'%';
@@ -2064,8 +2094,10 @@ function die(){
   
   if(gMode==='ship'){
     const ci=IM.cube, si=IM.ship;
-    if(ok(ci)) ox.drawImage(ci, -TILE*0.25, -TILE*0.35, TILE*0.5, TILE*0.5);
-    else {ox.fillStyle='#7DF';ox.fillRect(-TILE*0.25,-TILE*0.35,TILE*0.5,TILE*0.5);}
+    // Inner Layer (Cube)
+    if(ok(ci)) ox.drawImage(ci, -TILE*0.25, -TILE*0.55, TILE*0.5, TILE*0.5);
+    else {ox.fillStyle='#7DF';ox.fillRect(-TILE*0.25,-TILE*0.55,TILE*0.5,TILE*0.5);}
+    // Outer Layer (Ship Shell)
     if(ok(si)) ox.drawImage(si, -TILE*0.7, -TILE*0.35, TILE*1.4, TILE*0.7);
     else {ox.fillStyle='rgba(255,140,0,.85)';ox.fillRect(-TILE*0.7,-TILE*0.35,TILE*1.4,TILE*0.7);}
   } else if (gMode==='ufo'){
@@ -2076,8 +2108,8 @@ function die(){
     else {ox.fillStyle='#aaa';ox.beginPath();ox.arc(0,0,TILE*0.5,0,Math.PI*2);ox.fill();}
   } else if (gMode==='ball'){
     const bi=IM.ball;
-    if(ok(bi)) ox.drawImage(bi, -TILE*0.45, -TILE*0.45, TILE*0.9, TILE*0.9);
-    else {ox.fillStyle='#7DF';ox.beginPath();ox.arc(0,0,TILE*0.45,0,Math.PI*2);ox.fill();}
+    if(ok(bi)) ox.drawImage(bi, -TILE*0.65, -TILE*0.65, TILE*1.3, TILE*1.3);
+    else {ox.fillStyle='#7DF';ox.beginPath();ox.arc(0,0,TILE*0.65,0,Math.PI*2);ox.fill();}
   } else if (gMode==='wave'){
     const wi=IM.wave;
     if(ok(wi)) ox.drawImage(wi, -TILE*0.5, -TILE*0.45, TILE*1.0, TILE*0.9);
@@ -2100,6 +2132,7 @@ function die(){
           const sy = j * pSize;
           
           let hasPixels = false;
+          // Check if this slice has any visible pixels
           for(let px = Math.floor(sx); px < Math.floor(sx + pSize); px += 2){
               for(let py = Math.floor(sy); py < Math.floor(sy + pSize); py += 2){
                   const alpha = imgData[(py * 128 + px) * 4 + 3];
@@ -2227,6 +2260,7 @@ function drawG(){
   curLv.objs.forEach(obj=>{
     const t=td(obj.typeId),sc=obj.scale||1;
     
+    // D blocks are invisible in game
     if(t.kind==='dblock') return;
     
     let opac = obj.renderOpac !== undefined ? obj.renderOpac : 1;
@@ -2443,8 +2477,8 @@ function drawG(){
         else {gCtx2.fillStyle='#aaa';gCtx2.beginPath();gCtx2.arc(0,0,TILE*0.5,0,Math.PI*2);gCtx2.fill();}
       } else if (gMode==='ball'){
         const bi=IM.ball;
-        if(ok(bi)) gCtx2.drawImage(bi, -TILE*0.45, -TILE*0.45, TILE*0.9, TILE*0.9);
-        else {gCtx2.fillStyle='#7DF';gCtx2.beginPath();gCtx2.arc(0,0,TILE*0.45,0,Math.PI*2);gCtx2.fill();}
+        if(ok(bi)) gCtx2.drawImage(bi, -TILE*0.65, -TILE*0.65, TILE*1.3, TILE*1.3);
+        else {gCtx2.fillStyle='#7DF';gCtx2.beginPath();gCtx2.arc(0,0,TILE*0.65,0,Math.PI*2);gCtx2.fill();}
       } else if (gMode==='wave'){
         const wi=IM.wave;
         if(ok(wi)) gCtx2.drawImage(wi, -TILE*0.5, -TILE*0.45, TILE*1.0, TILE*0.9);
@@ -2464,7 +2498,7 @@ function drawG(){
         let hbRed = TILE * pScale, hbBlue = TILE * 0.30 * pScale;
         if(gMode==='wave'){ hbRed = TILE*0.14 * pScale; hbBlue = TILE*0.07 * pScale; }
         if(gMode==='ufo'){ hbRed = TILE*0.5 * pScale; hbBlue = TILE*0.2 * pScale; }
-        if(gMode==='ball'){ hbRed = TILE*0.45 * pScale; hbBlue = TILE*0.25 * pScale; }
+        if(gMode==='ball'){ hbRed = TILE*0.65 * pScale; hbBlue = TILE*0.5 * pScale; }
         gCtx2.strokeStyle= gMode==='wave' ? 'rgba(139,0,0,.95)' : 'rgba(255,100,100,.9)'; gCtx2.lineWidth=2; gCtx2.strokeRect(-hbRed/2, -hbRed/2, hbRed, hbRed);
         gCtx2.strokeStyle='rgba(60,60,255,.9)'; gCtx2.strokeRect(-hbBlue/2, -hbBlue/2, hbBlue, hbBlue);
         gCtx2.restore();
