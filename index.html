@@ -253,7 +253,7 @@ const CEIL_Y = -3*TILE;
 const SHIP_TUNNEL_H = GROUND_Y - CEIL_Y; 
 const GROUND_TS=250;
 const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1250;
-const SHIP_GRAV=2800, SHIP_THRUST=-3500, SHIP_MAXVY=1080;
+const SHIP_GRAV=3000, SHIP_THRUST=-3500, SHIP_MAXVY=1300;
 const BG_PAR=0.12;
 const BG_TS=1400;
 const tintCache = new Map();
@@ -302,6 +302,11 @@ const SRC={
   blue_orb:'https://i.imgur.com/Ux3VWbe.png',
   deco1:'https://i.imgur.com/Mp27IWo.png',
   deco2:'https://i.imgur.com/omTYQuo.png',
+  deco3:'https://i.imgur.com/ogm6cns.png',
+  deco4:'https://i.imgur.com/t1rCcWs.png',
+  deco5:'https://i.imgur.com/7y4yUFi.png',
+  pulse_circle:'https://i.imgur.com/kPQU4tP.png',
+  pulse_note:'https://i.imgur.com/ursVgye.png',
   bg_trigger:'https://i.imgur.com/zsf7WEb.png',
   ground_trigger:'https://i.imgur.com/55QWy7m.png',
   alpha_trigger:'https://i.imgur.com/sa2bFKP.png',
@@ -343,6 +348,11 @@ const TYPES=[
   {id:'saw',      lbl:'Saw',         img:'saw',      w:2,    h:2,   kind:'saw',   solid:false},
   {id:'deco1',    lbl:'Deco 1',      img:'deco1',    w:3.5,  h:1,   kind:'block', solid:false, isDeco:true},
   {id:'deco2',    lbl:'Deco 2',      img:'deco2',    w:1,    h:2.5, kind:'block', solid:false, isDeco:true},
+  {id:'deco3',    lbl:'Deco 3',      img:'deco3',    w:1.3,  h:0.5, kind:'block', solid:false, isDeco:true},
+  {id:'deco4',    lbl:'Deco 4',      img:'deco4',    w:3.8,  h:1.3, kind:'block', solid:false, isDeco:true},
+  {id:'deco5',    lbl:'Deco 5',      img:'deco5',    w:2.66, h:1.03,kind:'block', solid:false, isDeco:true},
+  {id:'pulse_circle',lbl:'Pulse\nCircle',img:'pulse_circle',w:1,h:1,kind:'pulse_deco',solid:false,isDeco:true},
+  {id:'pulse_note',  lbl:'Pulse\nNote',  img:'pulse_note',  w:1,h:1,kind:'pulse_deco',solid:false,isDeco:true},
   {id:'jump_pad', lbl:'Jump Pad',    img:'jump_pad', w:1.2,  h:0.2, kind:'pad',   solid:false},
   {id:'orb',      lbl:'Y. Orb',      img:'orb',      w:1,    h:1,   kind:'orb',   solid:false},
   {id:'pink_orb', lbl:'P. Orb',      img:'pink_orb', w:1,    h:1,   kind:'orb',   solid:false},
@@ -1059,7 +1069,7 @@ function placeObj(wx,wy){
   
   const occupied=edObjs.some(o=>{
     const ot=td(o.typeId),osc=o.scale||1;
-    if (t.isDeco || ot.isDeco) return false; 
+    if (t.isDeco || ot.isDeco || t.kind === 'pulse_deco' || ot.kind === 'pulse_deco') return false; 
     const ohw=ot.w*TILE*osc/2,ohh=ot.h*TILE*osc/2;
     const thw=sw/2,thh=sh/2;
     return Math.abs(o.x-sx)<(thw+ohw)*0.5&&Math.abs(o.y-sy)<(thh+ohh)*0.5;
@@ -1190,36 +1200,11 @@ function drawEd(){
     const img=IM[t.img];
     
     if(ok(img)) {
-      let isOrb = (t.kind === 'orb');
-      let drawGlow = false;
-      let glowAlpha = 1.0;
-      let opac = o.renderOpac !== undefined ? o.renderOpac : 1;
-
-      if (isOrb) {
-          let currentPulse = musicPulse;
-          let drawSw = sw * currentPulse;
-          let drawSh = sh * currentPulse;
-          
-          if(o.typeId === 'pink_orb') edCtx.shadowColor = '#FF55FF';
-          else if(o.typeId === 'blue_orb') edCtx.shadowColor = '#00AAFF';
-          else edCtx.shadowColor = '#FFD700';
-          
-          edCtx.shadowBlur = 30 * glowAlpha * opac;
-
-          if (t.isDeco && o.color) {
-            const tinted = getTinted(img, o.color, Math.ceil(drawSw), Math.ceil(drawSh));
-            edCtx.drawImage(tinted, -drawSw/2, -drawSh/2, drawSw, drawSh);
-          } else {
-            edCtx.drawImage(img,-drawSw/2,-drawSh/2,drawSw,drawSh);
-          }
-          edCtx.shadowBlur = 0;
+      if (t.isDeco && o.color) {
+        const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
+        edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
       } else {
-          if (t.isDeco && o.color) {
-            const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
-            edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
-          } else {
-            edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
-          }
+        edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
       }
       
       if (t.id === 'alpha_trigger' || t.id === 'move_trigger') {
@@ -1384,8 +1369,8 @@ function resetPl(){
 
 function gRes(){if(gC){gC.width=innerWidth;gC.height=innerHeight;}}
 function stopGame(){gRun=false;if(gAF){cancelAnimationFrame(gAF);gAF=null;}}
-function gKD(e){if(!gRun)return;if(e.code==='Space'||e.code==='ArrowUp'){if(!jHeld)jumpBuf=0.18; jHeld=true;}if(e.key==='m'||e.key==='M')hbx2=!hbx2;}
-function gKU(e){if(e.code==='Space'||e.code==='ArrowUp')jHeld=false;}
+function gKD(e){if(!gRun)return;if(e.code==='Space'||e.code==='ArrowUp'||e.code==='ArrowDown'){if(!jHeld)jumpBuf=0.18; jHeld=true;}if(e.key==='m'||e.key==='M')hbx2=!hbx2;}
+function gKU(e){if(e.code==='Space'||e.code==='ArrowUp'||e.code==='ArrowDown')jHeld=false;}
 function gClick(e){if(!gRun)return;if(won){exitGame();return;}if(dead)return; initAudio(); if(!jHeld)jumpBuf=0.18; jHeld=true;}
 function gMUp(){jHeld=false;}
 function exitGame(){
@@ -1784,7 +1769,7 @@ function updateG(dt){
             player.y = landingY - pLandHH;
             player.vy = 0; player.onGround = true;
         }
-        let ballRadius = TILE * 0.5 * pScale;
+        let ballRadius = TILE * 0.45 * pScale;
         if (player.y - ballRadius <= tunnelCeil) {
             player.y = tunnelCeil + ballRadius;
             if (player.vy < 0) player.vy = 0;
@@ -1797,7 +1782,7 @@ function updateG(dt){
             player.y = landingY + pLandHH;
             player.vy = 0; player.onGround = true;
         }
-        let ballRadius = TILE * 0.5 * pScale;
+        let ballRadius = TILE * 0.45 * pScale;
         if (player.y + ballRadius >= tunnelFloor) {
             player.y = tunnelFloor - ballRadius;
             if (player.vy > 0) player.vy = 0;
@@ -1823,7 +1808,7 @@ function updateG(dt){
   // --- Collision and Interaction Loop ---
   for(const obj of curLv.objs){
     const t=td(obj.typeId),sc=obj.scale||1;
-    if (t.isDeco) continue; 
+    if (t.isDeco || t.kind === 'pulse_deco') continue; 
     
     const ox = obj.x + (obj.offsetX || 0);
     const oy = obj.y + (obj.offsetY || 0);
@@ -2280,8 +2265,14 @@ function drawG(){
 
     let drawSw = sw, drawSh = sh;
     let isOrb = (t.kind === 'orb');
+    let isPulseDeco = (t.kind === 'pulse_deco');
     let drawGlow = false;
     let glowAlpha = 0;
+
+    if (isPulseDeco) {
+        drawSw *= musicPulse;
+        drawSh *= musicPulse;
+    }
 
     if (isOrb) {
         let currentPulse = musicPulse;
@@ -2328,7 +2319,7 @@ function drawG(){
         }
 
         if(t.isDeco && obj.color){
-          const tinted = getTinted(img, obj.color, Math.ceil(sw), Math.ceil(sh));
+          const tinted = getTinted(img, obj.color, Math.ceil(drawSw), Math.ceil(drawSh));
           gCtx2.drawImage(tinted, -drawSw/2, -drawSh/2, drawSw, drawSh);
         } else {
           gCtx2.drawImage(img,-drawSw/2,-drawSh/2,drawSw,drawSh);
