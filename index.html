@@ -253,7 +253,7 @@ const CEIL_Y = -3*TILE;
 const SHIP_TUNNEL_H = GROUND_Y - CEIL_Y; 
 const GROUND_TS=250;
 const PLAYER_SPD=650, GRAVITY=6000, JUMP_V=-1250;
-const SHIP_GRAV=3000, SHIP_THRUST=-3500, SHIP_MAXVY=1300;
+const SHIP_GRAV=2800, SHIP_THRUST=-3500, SHIP_MAXVY=1080;
 const BG_PAR=0.12;
 const BG_TS=1400;
 const tintCache = new Map();
@@ -1200,11 +1200,36 @@ function drawEd(){
     const img=IM[t.img];
     
     if(ok(img)) {
-      if (t.isDeco && o.color) {
-        const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
-        edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
+      let isOrb = (t.kind === 'orb');
+      let drawGlow = false;
+      let glowAlpha = 1.0;
+      let opac = o.renderOpac !== undefined ? o.renderOpac : 1;
+
+      if (isOrb) {
+          let currentPulse = musicPulse;
+          let drawSw = sw * currentPulse;
+          let drawSh = sh * currentPulse;
+          
+          if(o.typeId === 'pink_orb') edCtx.shadowColor = '#FF55FF';
+          else if(o.typeId === 'blue_orb') edCtx.shadowColor = '#00AAFF';
+          else edCtx.shadowColor = '#FFD700';
+          
+          edCtx.shadowBlur = 30 * glowAlpha * opac;
+
+          if (t.isDeco && o.color) {
+            const tinted = getTinted(img, o.color, Math.ceil(drawSw), Math.ceil(drawSh));
+            edCtx.drawImage(tinted, -drawSw/2, -drawSh/2, drawSw, drawSh);
+          } else {
+            edCtx.drawImage(img,-drawSw/2,-drawSh/2,drawSw,drawSh);
+          }
+          edCtx.shadowBlur = 0;
       } else {
-        edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
+          if (t.isDeco && o.color) {
+            const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
+            edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
+          } else {
+            edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
+          }
       }
       
       if (t.id === 'alpha_trigger' || t.id === 'move_trigger') {
@@ -1458,10 +1483,14 @@ function updateG(dt){
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(dataArray);
       let sum = 0;
-      for (let i = 0; i < 3; i++) sum += dataArray[i];
-      let avg = sum / 3;
-      let targetPulse = 1 + Math.pow(avg / 255, 2) * 0.6;
-      musicPulse += (targetPulse - musicPulse) * 20 * dt;
+      for (let i = 0; i < 2; i++) sum += dataArray[i];
+      let avg = sum / 2;
+      let targetPulse = 1 + Math.pow(avg / 255, 3) * 0.9;
+      if (targetPulse > musicPulse) {
+          musicPulse = targetPulse;
+      } else {
+          musicPulse += (1.0 - musicPulse) * 18 * dt;
+      }
   } else {
       musicPulse = 1.0;
   }
@@ -1541,8 +1570,17 @@ function updateG(dt){
   }
 
   let pScale = isMini ? 0.5 : 1;
-  const pRedHW = TILE * 0.35 * pScale, pRedHH = TILE * 0.35 * pScale;    
-  const pBlueHW = TILE * 0.15 * pScale, pBlueHH = TILE * 0.15 * pScale;  
+  
+  let pRedHW = TILE * 0.5 * pScale, pRedHH = TILE * 0.5 * pScale;
+  if(gMode==='wave'){ pRedHW = TILE*0.07 * pScale; pRedHH = TILE*0.07 * pScale; }
+  if(gMode==='ufo'){ pRedHW = TILE*0.25 * pScale; pRedHH = TILE*0.25 * pScale; }
+  if(gMode==='ball'){ pRedHW = TILE*0.325 * pScale; pRedHH = TILE*0.325 * pScale; }
+
+  let pBlueHW = TILE * 0.15 * pScale, pBlueHH = TILE * 0.15 * pScale;
+  if(gMode==='wave'){ pBlueHW = TILE*0.035 * pScale; pBlueHH = TILE*0.035 * pScale; }
+  if(gMode==='ufo'){ pBlueHW = TILE*0.1 * pScale; pBlueHH = TILE*0.1 * pScale; }
+  if(gMode==='ball'){ pBlueHW = TILE*0.25 * pScale; pBlueHH = TILE*0.25 * pScale; }
+
   let pLandHH = TILE * 0.5 * pScale;
 
   // --- Physics Update ---
@@ -2245,7 +2283,6 @@ function drawG(){
   curLv.objs.forEach(obj=>{
     const t=td(obj.typeId),sc=obj.scale||1;
     
-    // D blocks are invisible in game
     if(t.kind==='dblock') return;
     
     let opac = obj.renderOpac !== undefined ? obj.renderOpac : 1;
@@ -2307,7 +2344,7 @@ function drawG(){
         }
     }
 
-    gCtx2.globalAlpha = opac;
+    gCtx2.globalAlpha = isPulseDeco ? (0.5 * opac) : opac;
 
     if(t.kind !== 'trigger' || hbx2) {
       if(ok(img)){
