@@ -733,7 +733,7 @@ function openActiveMenu() {
             $('move-y').value = o.moveY !== undefined ? o.moveY : 0;
             $('move-time').value = o.moveTime !== undefined ? o.moveTime : 0.5;
             $('move-touch').checked = !!o.bgTouch;
-        } else if (type.isDeco) {
+        } else if (type.isDeco || type.kind === 'pulse_deco') {
             $('edit-deco-grp').style.display = 'flex';
             $('deco-col').value = o.color || '#ffffff';
         }
@@ -1057,7 +1057,7 @@ function delSel(){
 
 function placeObj(wx,wy){
   const t=selType,sc=selScale;
-  const step = (t.id === 'half_block' || t.id === 'small_spk' || t.id === 'black_spk' || t.isDeco) ? TILE/2 : TILE;
+  const step = (t.id === 'half_block' || t.id === 'small_spk' || t.id === 'black_spk' || t.isDeco || t.kind === 'pulse_deco') ? TILE/2 : TILE;
   const sw = t.w * TILE * sc;
   const sh = t.h * TILE * sc;
   
@@ -1200,36 +1200,11 @@ function drawEd(){
     const img=IM[t.img];
     
     if(ok(img)) {
-      let isOrb = (t.kind === 'orb');
-      let drawGlow = false;
-      let glowAlpha = 1.0;
-      let opac = o.renderOpac !== undefined ? o.renderOpac : 1;
-
-      if (isOrb) {
-          let currentPulse = musicPulse;
-          let drawSw = sw * currentPulse;
-          let drawSh = sh * currentPulse;
-          
-          if(o.typeId === 'pink_orb') edCtx.shadowColor = '#FF55FF';
-          else if(o.typeId === 'blue_orb') edCtx.shadowColor = '#00AAFF';
-          else edCtx.shadowColor = '#FFD700';
-          
-          edCtx.shadowBlur = 30 * glowAlpha * opac;
-
-          if (t.isDeco && o.color) {
-            const tinted = getTinted(img, o.color, Math.ceil(drawSw), Math.ceil(drawSh));
-            edCtx.drawImage(tinted, -drawSw/2, -drawSh/2, drawSw, drawSh);
-          } else {
-            edCtx.drawImage(img,-drawSw/2,-drawSh/2,drawSw,drawSh);
-          }
-          edCtx.shadowBlur = 0;
+      if (t.isDeco && o.color) {
+        const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
+        edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
       } else {
-          if (t.isDeco && o.color) {
-            const tinted = getTinted(img, o.color, Math.ceil(sw), Math.ceil(sh));
-            edCtx.drawImage(tinted, -sw/2, -sh/2, sw, sh);
-          } else {
-            edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
-          }
+        edCtx.drawImage(img,-sw/2,-sh/2,sw,sh);
       }
       
       if (t.id === 'alpha_trigger' || t.id === 'move_trigger') {
@@ -1662,8 +1637,8 @@ function updateG(dt){
     }
     if (player.y - shipRadius > tunnelCeil && player.y + shipRadius < tunnelFloor) player.onGround = false;
     
-    const tgt = Math.max(-50, Math.min(50, player.vy * 0.05));
-    player.rot += (tgt - player.rot) * 0.22;
+    const tgt = Math.max(-45, Math.min(45, player.vy * gravityDir * 0.045));
+    player.rot += (tgt - player.rot) * 15 * dt;
   } else if (gMode === 'ufo') {
     let curGrav = isMini ? 3800 : 2700;
     player.vy += curGrav * gravityDir * dt;
